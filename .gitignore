@@ -7,8 +7,10 @@
 /[Uu]ser[Ss]ettings/
 /.vs/
 /.idea/
+/.vscode/
 *.csproj
 *.sln
+*.slnx
 *.user
 *.pidb
 *.booproj
