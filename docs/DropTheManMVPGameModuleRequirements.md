@@ -82,6 +82,7 @@ The first `DropTheMan` game-module slice must provide:
 * a prototype-owned runtime representation for holes
 * a prototype-owned runtime representation for stickmen
 * a prototype-owned mapping from framework `ColorIdentity` to hole and stickman meaning
+* a prototype-owned rule query that answers whether a target cell is enterable for a specific hole
 * a prototype-owned rule entry point that evaluates collection
 * a prototype-owned rule entry point that evaluates win
 * a prototype-owned rule entry point that evaluates lose when timer-driven failure is enabled
@@ -105,38 +106,46 @@ These simplifications keep the prototype aligned with the approved framework MVP
 
 ---
 
-## Required Prototype Decisions Still Missing
+## Rule Definition Status
 
-The following rule details are not yet documented precisely enough to implement safely:
+The minimum gameplay-rule decisions that originally blocked prototype runtime implementation are now documented in:
 
-* exact collection trigger timing
-* exact wrong-color interaction result
-* exact timer usage for the first playable slice
-* exact win condition expression
-* exact lose condition expression when timer is active
+* `docs/DropTheManMVPRules.md`
 
-These are prototype-owned gameplay decisions.
+That rules document currently defines:
 
-They should be documented before substantial `DropAwayPrototype` runtime implementation begins.
+* collection timing
+* wrong-color interaction
+* timer usage
+* win condition
+* lose condition
+
+For current MVP planning, wrong-color behavior means entry blocking before overlap, not post-snap placement rejection.
 
 ---
 
 ## Implementation Rule
 
-Until the missing gameplay decisions above are documented, `DropAwayPrototype` implementation should stay limited to compile-safe scaffolding and requirement-definition work.
+Prototype implementation may proceed only within the approved rule boundaries documented in:
+
+* this requirements document
+* `docs/DropTheManMVPRules.md`
 
 Do not silently invent puzzle rules during coding.
 
 ---
 
-## Next Required Documentation Step
+## Next Required Implementation Step
 
-Create a small prototype rule document that answers:
+The next smallest safe runtime step is:
 
-1. When does collection happen?
-2. What happens on wrong-color overlap or placement?
-3. Is the first playable slice timed?
-4. What exactly causes win?
-5. What exactly causes lose?
+* prototype rule coordination on top of the built runtime model
 
-After that document is approved, prototype runtime implementation can proceed in small slices.
+That should connect:
+
+* target-cell enterability checks during interaction validation
+* snap outcomes
+* collection checks
+* wrong-color entry blocking
+* timer-driven lose requests
+* win evaluation

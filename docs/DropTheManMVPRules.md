@@ -53,7 +53,8 @@ Approved prototype interpretation:
 
 * structural occupancy blocks hole placement only where placement should truly fail
 * stickmen are tracked separately as collectible targets addressable by coordinate
-* collection checks happen after a successful snap resolves the hole position
+* prototype-owned rule queries may still treat some stickman coordinates as non-enterable for a specific hole
+* collection checks happen only after a successful snap resolves the hole position onto a color-compatible target
 
 This keeps framework occupancy generic while allowing prototype collection behavior.
 
@@ -72,7 +73,10 @@ Flow:
 ```text
 Drag preview
     ->
-Snap resolves final valid board position
+If target cell is wrong-color for the moving hole:
+    movement stays at last valid position
+    ->
+otherwise snap resolves final valid board position
     ->
 Prototype rule checks target cell
     ->
@@ -82,22 +86,24 @@ If matching stickman exists, collect it
 Reason:
 
 * this matches the existing framework boundary where drag previews and snap finalizes placement
-* this avoids smuggling collection meaning into drag preview logic
+* this avoids smuggling collection meaning into drag preview logic even though entry blocking may still be decided before snap finalization
 * this keeps the first prototype slice simpler to reason about
 
 ### 2. Wrong-Color Interaction
 
-If a hole snaps onto a cell containing a stickman of a different color:
+If a hole tries to move into a cell containing a stickman of a different color:
 
 * no collection happens
-* the placement is rejected
-* the hole returns to its last valid snapped position
+* that target cell is treated as non-enterable for that hole
+* drag preview should stop at the last valid position
+* snap should not resolve onto that coordinate
 
 Reason:
 
-* this preserves clear puzzle feedback
-* this avoids adding punishment systems or extra failure rules too early
-* this keeps wrong-color behavior consistent with snap-owned placement resolution
+* this preserves clear puzzle feedback earlier than post-snap rejection
+* this matches the intended gameplay behavior more closely
+* this keeps gameplay truth inside prototype-owned rule logic rather than physics-authoritative collision behavior
+* this still leaves room for later interpolation, smoothing, or collider-assisted feel as presentation only
 
 ### 3. Timer Usage
 
@@ -127,7 +133,7 @@ The level is lost when the timer expires before all stickmen are collected.
 Reason:
 
 * this gives the first slice a clean lose flow without inventing additional puzzle-specific failure mechanics
-* it stays independent from wrong-color interaction, which remains a placement rejection rather than an end-state trigger
+* it stays independent from wrong-color interaction, which remains a movement-blocking rule rather than an end-state trigger
 
 ---
 
@@ -138,6 +144,7 @@ The following are not part of the first playable slice:
 * hole capacity limits
 * wrong-color loss
 * collection during drag
+* physics-authoritative movement resolution
 * combo scoring
 * chain reactions
 * multi-cell holes
@@ -154,8 +161,9 @@ Prototype-owned:
 
 * hole color meaning
 * stickman color meaning
+* color-based target enterability
 * collection evaluation
-* wrong-color rejection
+* wrong-color entry blocking
 * win decision
 * lose decision
 * timer consequence interpretation
@@ -176,6 +184,6 @@ Framework-owned:
 
 After this rules document, the next smallest safe implementation slice is:
 
-* prototype-owned runtime data and contracts for holes and stickmen
-* coordinate-based stickman lookup that is separate from structural occupancy blocking
-* no scene/prefab spawning complexity beyond what is needed to compile and connect to the existing framework seams
+* a prototype-owned rule coordinator that evaluates target-cell enterability during interaction
+* matching collection after successful snap
+* timer-driven lose requests and win evaluation on top of the existing runtime model
