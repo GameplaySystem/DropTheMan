@@ -60,7 +60,7 @@ namespace DropAwayPrototype.Runtime
 
         /// <summary>
         /// Removes a stickman from the active coordinate index after a higher-level rule owner
-        /// has decided collection should happen.
+        /// has decided that a matching drag-time overlap should collect it.
         /// </summary>
         public bool TryRemove(GridCoordinate coordinate, out StickmanRuntimeState stickman)
         {

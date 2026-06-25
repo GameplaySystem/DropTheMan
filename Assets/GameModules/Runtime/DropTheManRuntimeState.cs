@@ -37,7 +37,8 @@ namespace DropAwayPrototype.Runtime
         public ColorIdentity ColorIdentity { get; }
 
         /// <summary>
-        /// Updates the authoritative hole grid coordinate after a successful placement.
+        /// Updates the authoritative hole grid coordinate after a game-module-approved
+        /// coordinate change.
         /// </summary>
         public void MoveTo(GridCoordinate coordinate)
         {
@@ -79,7 +80,7 @@ namespace DropAwayPrototype.Runtime
         public bool IsCollected { get; private set; }
 
         /// <summary>
-        /// Marks the stickman as collected after game-module rules approve collection.
+        /// Marks the stickman as collected after game-module rules approve a matching overlap.
         /// </summary>
         public void MarkCollected()
         {
