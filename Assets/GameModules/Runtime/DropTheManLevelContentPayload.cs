@@ -27,6 +27,7 @@ namespace DropAwayPrototype.Runtime
     {
         public string Id = string.Empty;
         public CellCoordinateData Coordinate = new();
+        public List<CellCoordinateData> FootprintOffsets = new();
         public ColorIdentity ColorIdentity = ColorIdentity.None;
 
         /// <summary>
@@ -36,6 +37,32 @@ namespace DropAwayPrototype.Runtime
         {
             return new GridCoordinate(Coordinate.X, Coordinate.Y);
         }
+
+        /// <summary>
+        /// Converts authored footprint offsets into runtime grid offsets.
+        /// Empty authored offsets fall back to a single-cell footprint for compatibility.
+        /// </summary>
+        public IReadOnlyList<GridCoordinate> ToFootprintOffsetsOrDefault()
+        {
+            if (FootprintOffsets == null || FootprintOffsets.Count == 0)
+            {
+                return DefaultSingleCellOffsets;
+            }
+
+            List<GridCoordinate> offsets = new(FootprintOffsets.Count);
+
+            for (int i = 0; i < FootprintOffsets.Count; i++)
+            {
+                offsets.Add(new GridCoordinate(FootprintOffsets[i].X, FootprintOffsets[i].Y));
+            }
+
+            return offsets;
+        }
+
+        private static readonly GridCoordinate[] DefaultSingleCellOffsets =
+        {
+            new GridCoordinate(0, 0)
+        };
     }
 
     /// <summary>

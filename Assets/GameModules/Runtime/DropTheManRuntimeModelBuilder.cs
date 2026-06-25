@@ -9,6 +9,9 @@ namespace DropAwayPrototype.Runtime
     /// Prototype-owned builder that turns validated framework context plus parsed game payload
     /// into puzzle-specific runtime state.
     /// This slice stops before scene-object creation and gameplay rule orchestration.
+    /// The builder commits initial structural occupancy for hole footprints only.
+    /// Later drag-time movement, release-time snap, and occupancy re-commit are intentionally
+    /// outside this slice.
     /// </summary>
     public sealed class DropTheManRuntimeModelBuilder
     {
@@ -64,29 +67,44 @@ namespace DropAwayPrototype.Runtime
             RuntimeLevelContext frameworkContext,
             out string failureReason)
         {
-            HashSet<GridCoordinate> holeCoordinates = new();
+            HashSet<GridCoordinate> holeFootprintCoordinates = new();
             HashSet<GridCoordinate> stickmanCoordinates = new();
 
             for (int i = 0; i < payload.Holes.Count; i++)
             {
-                GridCoordinate coordinate = payload.Holes[i].ToGridCoordinate();
-                if (!TryValidateStructuralCoordinate(
-                        coordinate,
-                        frameworkContext.GridBoard,
-                        out failureReason))
-                {
-                    failureReason = $"Hole '{payload.Holes[i].Id}' is invalid: {failureReason}";
-                    return false;
-                }
+                GridCoordinate originCoordinate = payload.Holes[i].ToGridCoordinate();
+                IReadOnlyList<GridCoordinate> footprintOffsets =
+                    payload.Holes[i].ToFootprintOffsetsOrDefault();
 
-                if (frameworkContext.CellOccupancySystem.IsInUse(coordinate))
+                for (int offsetIndex = 0; offsetIndex < footprintOffsets.Count; offsetIndex++)
                 {
-                    failureReason =
-                        $"Hole '{payload.Holes[i].Id}' starts on occupied or reserved coordinate {coordinate}.";
-                    return false;
-                }
+                    GridCoordinate coordinate =
+                        originCoordinate.Offset(
+                            footprintOffsets[offsetIndex].X,
+                            footprintOffsets[offsetIndex].Y);
+                    if (!TryValidateStructuralCoordinate(
+                            coordinate,
+                            frameworkContext.GridBoard,
+                            out failureReason))
+                    {
+                        failureReason = $"Hole '{payload.Holes[i].Id}' is invalid: {failureReason}";
+                        return false;
+                    }
 
-                holeCoordinates.Add(coordinate);
+                    if (frameworkContext.CellOccupancySystem.IsInUse(coordinate))
+                    {
+                        failureReason =
+                            $"Hole '{payload.Holes[i].Id}' starts on occupied or reserved coordinate {coordinate}.";
+                        return false;
+                    }
+
+                    if (!holeFootprintCoordinates.Add(coordinate))
+                    {
+                        failureReason =
+                            $"Hole '{payload.Holes[i].Id}' overlaps another hole footprint at coordinate {coordinate}.";
+                        return false;
+                    }
+                }
             }
 
             for (int i = 0; i < payload.Stickmen.Count; i++)
@@ -110,10 +128,10 @@ namespace DropAwayPrototype.Runtime
                 }
 
                 // The first slice does not support unresolved start-on-target states.
-                if (holeCoordinates.Contains(coordinate))
+                if (holeFootprintCoordinates.Contains(coordinate))
                 {
                     failureReason =
-                        $"Stickman '{payload.Stickmen[i].Id}' starts on hole coordinate {coordinate}.";
+                        $"Stickman '{payload.Stickmen[i].Id}' starts on hole footprint coordinate {coordinate}.";
                     return false;
                 }
             }
@@ -160,19 +178,34 @@ namespace DropAwayPrototype.Runtime
             for (int i = 0; i < holeDefinitions.Count; i++)
             {
                 GridCoordinate coordinate = holeDefinitions[i].ToGridCoordinate();
-                CellOccupancyOperationResult occupancyResult =
-                    frameworkContext.CellOccupancySystem.Occupy(coordinate);
-                if (!occupancyResult.Success)
+                ShapeFootprint footprint = new(holeDefinitions[i].ToFootprintOffsetsOrDefault());
+                IReadOnlyList<GridCoordinate> resolvedFootprint = footprint.ResolveCoordinates(coordinate);
+                List<GridCoordinate> occupiedCoordinates = new(resolvedFootprint.Count);
+
+                for (int footprintIndex = 0; footprintIndex < resolvedFootprint.Count; footprintIndex++)
                 {
-                    failureReason =
-                        $"Failed to occupy start coordinate for hole '{holeDefinitions[i].Id}': {occupancyResult.FailureReason}";
-                    return false;
+                    CellOccupancyOperationResult occupancyResult =
+                        frameworkContext.CellOccupancySystem.Occupy(resolvedFootprint[footprintIndex]);
+                    if (!occupancyResult.Success)
+                    {
+                        for (int rollbackIndex = occupiedCoordinates.Count - 1; rollbackIndex >= 0; rollbackIndex--)
+                        {
+                            frameworkContext.CellOccupancySystem.Release(occupiedCoordinates[rollbackIndex]);
+                        }
+
+                        failureReason =
+                            $"Failed to occupy start footprint coordinate for hole '{holeDefinitions[i].Id}': {occupancyResult.FailureReason}";
+                        return false;
+                    }
+
+                    occupiedCoordinates.Add(resolvedFootprint[footprintIndex]);
                 }
 
                 holes.Add(
                     new HoleRuntimeState(
                         holeDefinitions[i].Id,
                         coordinate,
+                        footprint,
                         holeDefinitions[i].ColorIdentity));
             }
 

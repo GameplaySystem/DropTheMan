@@ -9,6 +9,8 @@ namespace DropAwayPrototype.Runtime
     /// Prototype-owned helper that enumerates deterministic swept footprint contact groups
     /// for freeform drag validation in board-local continuous cell space.
     /// This helper does not own color rules, collection, capacity, or outcome logic.
+    /// It also does not own committed board state. Callers must decide how swept contact groups
+    /// relate to structural occupancy, drag-session state, and release-time commit.
     /// </summary>
     internal sealed class SweptFootprintHelper
     {

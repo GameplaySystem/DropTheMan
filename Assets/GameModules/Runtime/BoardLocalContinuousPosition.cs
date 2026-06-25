@@ -40,6 +40,14 @@ namespace DropAwayPrototype.Runtime
                 Mathf.Lerp(from.Y, to.Y, t));
         }
 
+        public Vector3 ToWorld(GridWorldLayout worldLayout)
+        {
+            return new Vector3(
+                worldLayout.BoardOrigin.x + (X * worldLayout.CellSize.x),
+                worldLayout.BoardOrigin.y + (Y * worldLayout.CellSize.y),
+                worldLayout.BoardOrigin.z);
+        }
+
         public float DistanceTo(BoardLocalContinuousPosition other)
         {
             return Vector2.Distance(new Vector2(X, Y), new Vector2(other.X, other.Y));

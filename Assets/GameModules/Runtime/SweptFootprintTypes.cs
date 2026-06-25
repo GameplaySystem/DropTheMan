@@ -85,6 +85,8 @@ namespace DropAwayPrototype.Runtime
     /// <summary>
     /// Request for prototype-owned swept footprint enumeration.
     /// World positions are converted into board-local continuous cell space internally.
+    /// The request models freeform drag movement only. It does not imply snap, committed
+    /// occupancy changes, or any release-time board-state update.
     /// </summary>
     internal readonly struct SweptFootprintRequest
     {

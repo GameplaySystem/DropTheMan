@@ -1,18 +1,46 @@
 using System;
+using System.Collections.Generic;
 using PuzzleFramework.CoreBoard;
 using PuzzleFramework.Presentation;
 
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
+    /// Prototype-owned lifecycle for a draggable collector.
+    /// This stays game-specific because the meaning of each state is puzzle-owned.
+    /// </summary>
+    public enum HoleLifecycleState
+    {
+        Active = 0,
+        Full = 1,
+        Closing = 2,
+        Completed = 3
+    }
+
+    /// <summary>
+    /// Prototype-owned lifecycle for collectible targets.
+    /// This separates immediate gameplay acceptance from later visual completion.
+    /// </summary>
+    public enum StickmanLifecycleState
+    {
+        Available = 0,
+        Collecting = 1,
+        Collected = 2
+    }
+
+    /// <summary>
     /// Prototype-owned mutable runtime state for a hole.
     /// This carries puzzle-specific meaning and stays outside the framework.
+    /// CurrentCoordinate is the committed board origin for the hole footprint, not the live
+    /// freeform visual drag position. Do not update it on every drag sample.
+    /// A later release/snap/commit owner should update it only when committed board state changes.
     /// </summary>
     public sealed class HoleRuntimeState
     {
         public HoleRuntimeState(
             string id,
             GridCoordinate currentCoordinate,
+            ShapeFootprint footprint,
             ColorIdentity colorIdentity)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -29,26 +57,99 @@ namespace DropAwayPrototype.Runtime
 
             Id = id;
             CurrentCoordinate = currentCoordinate;
+            Footprint = footprint ?? throw new ArgumentNullException(nameof(footprint));
             ColorIdentity = colorIdentity;
+            LifecycleState = HoleLifecycleState.Active;
         }
 
         public string Id { get; }
+        /// <summary>
+        /// Committed board origin for the hole footprint.
+        /// This is not the same thing as the live freeform drag position during interaction.
+        /// </summary>
         public GridCoordinate CurrentCoordinate { get; private set; }
+        public ShapeFootprint Footprint { get; }
         public ColorIdentity ColorIdentity { get; }
+        public HoleLifecycleState LifecycleState { get; private set; }
+        public int FillCount { get; private set; }
+        public int Capacity => Footprint.CellCount;
+        public bool IsDraggable => LifecycleState == HoleLifecycleState.Active;
+        public bool HasRemainingCapacity => LifecycleState == HoleLifecycleState.Active && FillCount < Capacity;
 
         /// <summary>
-        /// Updates the authoritative hole grid coordinate after a game-module-approved
-        /// coordinate change.
+        /// Updates the committed hole board coordinate after a later game-module-approved
+        /// board-state commit.
+        /// This should not be used for every drag sample because visual/freeform drag state
+        /// is intentionally tracked outside this runtime state object.
         /// </summary>
         public void MoveTo(GridCoordinate coordinate)
         {
             CurrentCoordinate = coordinate;
+        }
+
+        /// <summary>
+        /// Resolves the current footprint coordinates from the committed origin cell.
+        /// </summary>
+        public IReadOnlyList<GridCoordinate> ResolveFootprintCoordinates()
+        {
+            return Footprint.ResolveCoordinates(CurrentCoordinate);
+        }
+
+        /// <summary>
+        /// Applies one accepted drag-time collection to the hole fill state.
+        /// The hole becomes Full immediately when capacity is reached.
+        /// </summary>
+        public bool TryAcceptCollectible()
+        {
+            if (!HasRemainingCapacity)
+            {
+                return false;
+            }
+
+            FillCount++;
+            if (FillCount >= Capacity)
+            {
+                LifecycleState = HoleLifecycleState.Full;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Moves a full hole into its completion sequence once presentation begins.
+        /// </summary>
+        public void BeginClosing()
+        {
+            if (LifecycleState != HoleLifecycleState.Full)
+            {
+                throw new InvalidOperationException(
+                    $"Hole '{Id}' can only begin closing from the Full state.");
+            }
+
+            LifecycleState = HoleLifecycleState.Closing;
+        }
+
+        /// <summary>
+        /// Marks the hole as fully completed and removed from active gameplay.
+        /// </summary>
+        public void MarkCompleted()
+        {
+            if (LifecycleState != HoleLifecycleState.Closing &&
+                LifecycleState != HoleLifecycleState.Full)
+            {
+                throw new InvalidOperationException(
+                    $"Hole '{Id}' can only complete after it is full.");
+            }
+
+            LifecycleState = HoleLifecycleState.Completed;
         }
     }
 
     /// <summary>
     /// Prototype-owned runtime state for a collectible stickman.
     /// Stickmen are tracked separately from structural occupancy blocking.
+    /// A stickman may remain visually present while Collecting, but gameplay truth no longer
+    /// treats it as an active blocking or collectible target once collection begins.
     /// </summary>
     public sealed class StickmanRuntimeState
     {
@@ -77,14 +178,35 @@ namespace DropAwayPrototype.Runtime
         public string Id { get; }
         public GridCoordinate Coordinate { get; }
         public ColorIdentity ColorIdentity { get; }
-        public bool IsCollected { get; private set; }
+        public StickmanLifecycleState LifecycleState { get; private set; }
+        public bool IsCollected => LifecycleState == StickmanLifecycleState.Collected;
 
         /// <summary>
-        /// Marks the stickman as collected after game-module rules approve a matching overlap.
+        /// Marks the stickman as collecting immediately after a matching overlap is accepted.
+        /// This removes blocking without waiting for presentation completion.
+        /// </summary>
+        public void BeginCollection()
+        {
+            if (LifecycleState != StickmanLifecycleState.Available)
+            {
+                throw new InvalidOperationException(
+                    $"Stickman '{Id}' can only begin collection from the Available state.");
+            }
+
+            LifecycleState = StickmanLifecycleState.Collecting;
+        }
+
+        /// <summary>
+        /// Marks the stickman as fully collected after presentation or cleanup completes.
         /// </summary>
         public void MarkCollected()
         {
-            IsCollected = true;
+            if (LifecycleState == StickmanLifecycleState.Collected)
+            {
+                return;
+            }
+
+            LifecycleState = StickmanLifecycleState.Collected;
         }
     }
 }

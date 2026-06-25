@@ -127,6 +127,11 @@ namespace DropAwayPrototype.Runtime
                     return false;
                 }
 
+                if (!TryValidateFootprintOffsets(hole, out failureReason))
+                {
+                    return false;
+                }
+
                 string coordinateKey = $"{hole.Coordinate.X},{hole.Coordinate.Y}";
                 if (!coordinates.Add(coordinateKey))
                 {
@@ -134,6 +139,54 @@ namespace DropAwayPrototype.Runtime
                         $"Hole definitions contain duplicate coordinate {coordinateKey}.";
                     return false;
                 }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateFootprintOffsets(
+            DropTheManHoleDefinition hole,
+            out string failureReason)
+        {
+            if (hole.FootprintOffsets == null || hole.FootprintOffsets.Count == 0)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            bool containsOriginOffset = false;
+            HashSet<string> offsets = new();
+
+            for (int i = 0; i < hole.FootprintOffsets.Count; i++)
+            {
+                CellCoordinateData offset = hole.FootprintOffsets[i];
+                if (offset == null)
+                {
+                    failureReason =
+                        $"Hole definition '{hole.Id}' contains a null footprint offset at index {i}.";
+                    return false;
+                }
+
+                string offsetKey = $"{offset.X},{offset.Y}";
+                if (!offsets.Add(offsetKey))
+                {
+                    failureReason =
+                        $"Hole definition '{hole.Id}' contains duplicate footprint offset {offsetKey}.";
+                    return false;
+                }
+
+                if (offset.X == 0 && offset.Y == 0)
+                {
+                    containsOriginOffset = true;
+                }
+            }
+
+            if (!containsOriginOffset)
+            {
+                failureReason =
+                    $"Hole definition '{hole.Id}' footprint must include the origin offset 0,0.";
+                return false;
             }
 
             failureReason = string.Empty;
