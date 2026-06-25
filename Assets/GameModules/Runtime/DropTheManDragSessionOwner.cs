@@ -137,6 +137,11 @@ namespace DropAwayPrototype.Runtime
 
         public bool Success { get; }
         public Vector3 AuthoritativeWorldPosition { get; }
+        /// <summary>
+        /// Legacy handoff flag from the earlier deferred-release slice.
+        /// The current implementation performs non-full release commit immediately through the
+        /// dedicated release-commit service, so successful release now returns false here.
+        /// </summary>
         public bool RequiresFutureSnapCommit { get; }
         public bool EndedBecauseHoleBecameFull { get; }
         public string FailureReason { get; }
@@ -184,6 +189,7 @@ namespace DropAwayPrototype.Runtime
             Array.Empty<GridCoordinate>();
 
         private readonly DropTheManMovementCoordinator _movementCoordinator = new();
+        private readonly DropTheManReleaseCommitService _releaseCommitService = new();
 
         private DropTheManRuntimeModel _runtimeModel;
         private HoleRuntimeState _activeHole;
@@ -315,10 +321,10 @@ namespace DropAwayPrototype.Runtime
         }
 
         /// <summary>
-        /// Ends the current drag session without performing snap or committed occupancy updates.
-        /// A non-full hole reports that future snap or commit work is still required.
-        /// A hole that already stopped because it became full does not route through normal
-        /// release-time snap behavior in this slice.
+        /// Ends the current drag session.
+        /// Non-full active holes delegate release-time snap and occupancy commit to the dedicated
+        /// release-commit service. A hole that already stopped because it became full does not
+        /// route through the normal non-full release path.
         /// </summary>
         public DropTheManDragSessionReleaseResult Release()
         {
@@ -330,14 +336,35 @@ namespace DropAwayPrototype.Runtime
             }
 
             bool endedBecauseHoleBecameFull = _sessionEndedBecauseHoleBecameFull;
-            bool requiresFutureSnapCommit = _isSessionActive && _activeHole.IsDraggable;
             Vector3 authoritativeWorldPosition = PreviousAcceptedWorldPosition;
+
+            if (!endedBecauseHoleBecameFull && _isSessionActive && _runtimeModel != null)
+            {
+                DropTheManReleaseCommitResult commitResult =
+                    _releaseCommitService.CommitRelease(
+                        _runtimeModel,
+                        _activeHole,
+                        authoritativeWorldPosition,
+                        _worldLayout);
+
+                authoritativeWorldPosition = commitResult.AuthoritativeWorldPosition;
+                ClearSession();
+
+                return commitResult.Success
+                    ? DropTheManDragSessionReleaseResult.Released(
+                        authoritativeWorldPosition,
+                        false,
+                        false)
+                    : DropTheManDragSessionReleaseResult.Failed(
+                        authoritativeWorldPosition,
+                        commitResult.FailureReason);
+            }
 
             ClearSession();
 
             return DropTheManDragSessionReleaseResult.Released(
                 authoritativeWorldPosition,
-                requiresFutureSnapCommit,
+                false,
                 endedBecauseHoleBecameFull);
         }
 
