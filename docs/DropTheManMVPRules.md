@@ -10,6 +10,10 @@ This document is prototype-owned.
 
 It does not move puzzle meaning into `PuzzleFramework`.
 
+Detailed movement, collection, capacity, and win-sequencing rules are further locked in:
+
+* `docs/DropTheManMovementAndCollectionRules.md`
+
 ---
 
 ## Problem
@@ -30,11 +34,11 @@ Without those decisions, runtime implementation would be forced to invent puzzle
 
 The first playable slice uses these simplifying assumptions:
 
-* holes are single-cell objects
+* holes include the intended multi-cell MVP shapes
 * stickmen are single-cell objects
-* hole capacity is not used in the first slice
+* hole capacity is part of the first slice
 * queue, buffer, pathfinding, and progression remain out of scope
-* collection is evaluated after snap, not during drag preview
+* collection is evaluated during drag when a matching target cell is entered
 
 These assumptions match the approved MVP narrowing decisions.
 
@@ -46,15 +50,15 @@ These assumptions match the approved MVP narrowing decisions.
 
 Reason:
 
-* the hole must be able to snap onto a collectible target cell
-* if stickmen occupy structural blocking space in the same way as holes, collection becomes impossible
+* same-color target cells must stay enterable so drag-time collection can happen
+* if stickmen occupy structural blocking space in the same way as holes, matching overlap and collection become impossible
 
 Approved prototype interpretation:
 
 * structural occupancy blocks hole placement only where placement should truly fail
 * stickmen are tracked separately as collectible targets addressable by coordinate
 * prototype-owned rule queries may still treat some stickman coordinates as non-enterable for a specific hole
-* collection checks happen only after a successful snap resolves the hole position onto a color-compatible target
+* collection checks happen during drag when a color-compatible target cell is entered or overlapped
 
 This keeps framework occupancy generic while allowing prototype collection behavior.
 
@@ -64,9 +68,9 @@ This keeps framework occupancy generic while allowing prototype collection behav
 
 ### 1. Collection Timing
 
-Collection is evaluated after a successful snap.
+Collection is evaluated during drag.
 
-It is not evaluated continuously during drag preview.
+It is not owned by release-time snap alignment.
 
 Flow:
 
@@ -76,18 +80,20 @@ Drag preview
 If target cell is wrong-color for the moving hole:
     movement stays at last valid position
     ->
-otherwise snap resolves final valid board position
+If target cell is same-color for the moving hole:
+    overlap is allowed
+    collectible is collected immediately
     ->
-Prototype rule checks target cell
+Player releases drag
     ->
-If matching stickman exists, collect it
+Snap aligns the hole to the final valid grid position
 ```
 
 Reason:
 
-* this matches the existing framework boundary where drag previews and snap finalizes placement
-* this avoids smuggling collection meaning into drag preview logic even though entry blocking may still be decided before snap finalization
-* this keeps the first prototype slice simpler to reason about
+* this matches the intended gameplay behavior
+* this keeps snap limited to release-time alignment instead of making it the owner of collection timing
+* this keeps color-based collection meaning inside prototype-owned rules
 
 ### 2. Wrong-Color Interaction
 
@@ -96,7 +102,7 @@ If a hole tries to move into a cell containing a stickman of a different color:
 * no collection happens
 * that target cell is treated as non-enterable for that hole
 * drag preview should stop at the last valid position
-* snap should not resolve onto that coordinate
+* snap does not own this rejection because the hole should never be allowed into that cell during drag
 
 Reason:
 
@@ -117,7 +123,23 @@ Reason:
 * timer expiry is the narrowest reusable lose condition already supported by the framework
 * this proves the `TimerSystem` and `GameStateSystem` with a real prototype use case
 
-### 4. Win Condition
+### 4. Hole Capacity And Completion
+
+For the MVP:
+
+* hole capacity is determined by the current hole shape
+* a hole can collect only until it reaches that capacity
+* when a hole becomes full during drag, it stops movement immediately
+* a full hole becomes non-draggable immediately
+* the collected targets finish their collection animation first
+* after target visuals finish, the hole aligns, closes, and disappears
+
+Reason:
+
+* this is core `Drop The Man` behavior, not optional polish
+* it keeps capacity meaning prototype-owned instead of forcing early framework generalization
+
+### 5. Win Condition
 
 The level is won when all authored stickmen in the level have been collected.
 
@@ -125,8 +147,9 @@ Reason:
 
 * this is the smallest clear completion rule
 * it aligns with the core game description already captured in framework docs
+* the final win request should respect the full-hole completion sequence rather than bypassing it
 
-### 5. Lose Condition
+### 6. Lose Condition
 
 The level is lost when the timer expires before all stickmen are collected.
 
@@ -141,13 +164,10 @@ Reason:
 
 The following are not part of the first playable slice:
 
-* hole capacity limits
 * wrong-color loss
-* collection during drag
 * physics-authoritative movement resolution
 * combo scoring
 * chain reactions
-* multi-cell holes
 * multi-cell stickman groups
 * queue or buffer-style staging
 
@@ -162,7 +182,9 @@ Prototype-owned:
 * hole color meaning
 * stickman color meaning
 * color-based target enterability
-* collection evaluation
+* drag-time collection evaluation
+* shape-based capacity meaning
+* full-hole close and disappear sequencing
 * wrong-color entry blocking
 * win decision
 * lose decision
@@ -185,5 +207,8 @@ Framework-owned:
 After this rules document, the next smallest safe implementation slice is:
 
 * a prototype-owned rule coordinator that evaluates target-cell enterability during interaction
-* matching collection after successful snap
+* matching collection during drag
+* shape-based capacity completion
 * timer-driven lose requests and win evaluation on top of the existing runtime model
+
+Implementation should follow the detailed rules document above rather than re-inferring edge-case behavior from this summary.
