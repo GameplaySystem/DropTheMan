@@ -62,6 +62,7 @@ namespace DropAwayPrototype.Runtime
             bool shouldStopDragging,
             bool holeBecameFull,
             IReadOnlyList<StickmanRuntimeState> newlyCollectingStickmen,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult,
             string failureReason)
         {
             Success = success;
@@ -71,6 +72,7 @@ namespace DropAwayPrototype.Runtime
             HoleBecameFull = holeBecameFull;
             NewlyCollectingStickmen = newlyCollectingStickmen ??
                                       Array.Empty<StickmanRuntimeState>();
+            FullHoleCompletionResult = fullHoleCompletionResult;
             FailureReason = failureReason ?? string.Empty;
         }
 
@@ -80,6 +82,11 @@ namespace DropAwayPrototype.Runtime
         public bool ShouldStopDragging { get; }
         public bool HoleBecameFull { get; }
         public IReadOnlyList<StickmanRuntimeState> NewlyCollectingStickmen { get; }
+        /// <summary>
+        /// Explicit full-hole completion result for the current update.
+        /// Non-full updates return a NotTriggered result.
+        /// </summary>
+        public DropTheManFullHoleCompletionResult FullHoleCompletionResult { get; }
         public string FailureReason { get; }
 
         public static DropTheManDragSessionUpdateResult Evaluated(
@@ -87,7 +94,8 @@ namespace DropAwayPrototype.Runtime
             bool sessionIsActive,
             bool shouldStopDragging,
             bool holeBecameFull,
-            IList<StickmanRuntimeState> newlyCollectingStickmen)
+            IList<StickmanRuntimeState> newlyCollectingStickmen,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult)
         {
             return new DropTheManDragSessionUpdateResult(
                 true,
@@ -98,6 +106,7 @@ namespace DropAwayPrototype.Runtime
                 new ReadOnlyCollection<StickmanRuntimeState>(
                     new List<StickmanRuntimeState>(
                         newlyCollectingStickmen ?? throw new ArgumentNullException(nameof(newlyCollectingStickmen)))),
+                fullHoleCompletionResult,
                 string.Empty);
         }
 
@@ -112,6 +121,26 @@ namespace DropAwayPrototype.Runtime
                 false,
                 false,
                 Array.Empty<StickmanRuntimeState>(),
+                DropTheManFullHoleCompletionResult.NotTriggered(),
+                failureReason);
+        }
+
+        public static DropTheManDragSessionUpdateResult FailedAfterFullHoleStop(
+            Vector3 authoritativeWorldPosition,
+            IList<StickmanRuntimeState> newlyCollectingStickmen,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+            string failureReason)
+        {
+            return new DropTheManDragSessionUpdateResult(
+                false,
+                authoritativeWorldPosition,
+                false,
+                true,
+                true,
+                new ReadOnlyCollection<StickmanRuntimeState>(
+                    new List<StickmanRuntimeState>(
+                        newlyCollectingStickmen ?? throw new ArgumentNullException(nameof(newlyCollectingStickmen)))),
+                fullHoleCompletionResult,
                 failureReason);
         }
     }
@@ -179,9 +208,10 @@ namespace DropAwayPrototype.Runtime
     /// The caller must not invoke <see cref="UpdateDrag"/> twice for the same pointer sample.
     /// Visual movement must follow the returned authoritative world position instead of raw
     /// pointer position.
-    /// <see cref="HoleRuntimeState.CurrentCoordinate"/> remains committed board state during drag,
-    /// framework occupancy remains committed to the pre-drag footprint during drag, and snap or
-    /// committed occupancy updates are intentionally deferred.
+    /// <see cref="HoleRuntimeState.CurrentCoordinate"/> remains committed board state during drag
+    /// even though non-full release later updates it through the dedicated release-commit service.
+    /// Full holes are handled separately by the dedicated completion service and do not enter the
+    /// normal non-full release snap/commit path.
     /// </summary>
     public sealed class DropTheManDragSessionOwner
     {
@@ -190,6 +220,7 @@ namespace DropAwayPrototype.Runtime
 
         private readonly DropTheManMovementCoordinator _movementCoordinator = new();
         private readonly DropTheManReleaseCommitService _releaseCommitService = new();
+        private readonly DropTheManFullHoleCompletionService _fullHoleCompletionService = new();
 
         private DropTheManRuntimeModel _runtimeModel;
         private HoleRuntimeState _activeHole;
@@ -309,6 +340,28 @@ namespace DropAwayPrototype.Runtime
             {
                 _isSessionActive = false;
                 _sessionEndedBecauseHoleBecameFull = coordinatorResult.HoleBecameFull;
+
+                if (coordinatorResult.HoleBecameFull)
+                {
+                    DropTheManFullHoleCompletionResult completionResult =
+                        _fullHoleCompletionService.CompleteFullHole(_runtimeModel, _activeHole);
+
+                    return completionResult.Success
+                        ? DropTheManDragSessionUpdateResult.Evaluated(
+                            PreviousAcceptedWorldPosition,
+                            _isSessionActive,
+                            true,
+                            true,
+                            coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
+                            new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
+                            completionResult)
+                        : DropTheManDragSessionUpdateResult.FailedAfterFullHoleStop(
+                            PreviousAcceptedWorldPosition,
+                            coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
+                            new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
+                            completionResult,
+                            completionResult.FailureReason);
+                }
             }
 
             return DropTheManDragSessionUpdateResult.Evaluated(
@@ -317,7 +370,8 @@ namespace DropAwayPrototype.Runtime
                 coordinatorResult.ShouldStopDragging,
                 coordinatorResult.HoleBecameFull,
                 coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
-                new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen));
+                new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
+                DropTheManFullHoleCompletionResult.NotTriggered());
         }
 
         /// <summary>
