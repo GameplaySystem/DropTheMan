@@ -495,6 +495,20 @@ Win does not happen at raw overlap.
 
 Win does not happen merely because the final collectible starts animating.
 
+User-facing goal:
+
+```text
+Collect all required stickmen.
+```
+
+Runtime victory gate:
+
+```text
+all required holes completed
+```
+
+Stickman collection is a prerequisite to filling holes, but collected or collecting stickmen alone must not trigger victory.
+
 Final win gate for MVP:
 
 ```text

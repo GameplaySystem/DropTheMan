@@ -141,22 +141,41 @@ Reason:
 
 ### 5. Win Condition
 
-The level is won when all authored stickmen in the level have been collected.
+User-facing goal:
+
+```text
+Collect all required stickmen.
+```
+
+Runtime victory gate:
+
+```text
+All required holes are completed.
+```
+
+Stickman collection happens during drag.
+
+Victory must not trigger from raw collection overlap, collection acceptance, or a stickman entering `Collecting`.
+
+The final win request may only happen after the game-module outcome owner confirms all required holes have reached `Completed`.
 
 Reason:
 
-* this is the smallest clear completion rule
-* it aligns with the core game description already captured in framework docs
+* this preserves the player-facing collection objective
+* this prevents victory from bypassing full-hole completion
 * the final win request should respect the full-hole completion sequence rather than bypassing it
 
 ### 6. Lose Condition
 
-The level is lost when the timer expires before all stickmen are collected.
+The level is lost when timer expiry is accepted before the runtime victory gate is accepted.
+
+Timer expiry must eventually compete with hole-completion victory through a single terminal-state guard.
 
 Reason:
 
 * this gives the first slice a clean lose flow without inventing additional puzzle-specific failure mechanics
 * it stays independent from wrong-color interaction, which remains a movement-blocking rule rather than an end-state trigger
+* it prevents simultaneous or duplicate `Won` and `Lost` outcomes
 
 ---
 

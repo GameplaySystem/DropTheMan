@@ -89,7 +89,7 @@ The first `DropTheMan` game-module slice must provide:
 * a prototype-owned rule query that answers whether a target cell is enterable for a specific hole
 * a prototype-owned rule entry point that evaluates drag-time collection
 * a prototype-owned rule entry point that evaluates shape-based capacity completion
-* a prototype-owned rule entry point that evaluates win
+* a prototype-owned rule entry point that evaluates win after all required holes are completed
 * a prototype-owned rule entry point that evaluates lose when timer-driven failure is enabled
 * prototype-owned adapters that connect framework construction and interaction outputs to puzzle-specific rules
 
@@ -127,6 +127,10 @@ That rules document currently defines:
 * timer usage
 * win condition
 * lose condition
+
+For current MVP planning, the player-facing objective may be described as collecting all required stickmen, but the runtime victory gate is all required holes completed.
+
+Collected or collecting stickmen alone must not trigger victory.
 
 The dedicated movement and collection rules document locks the lower-level interaction details such as:
 

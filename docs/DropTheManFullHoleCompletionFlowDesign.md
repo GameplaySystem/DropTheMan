@@ -76,6 +76,10 @@ but should not decide:
 the level is won
 ```
 
+`DropTheManFullHoleCompletionResult` is an input fact for later outcome routing.
+
+It is not a terminal outcome by itself.
+
 ---
 
 ## Risks
