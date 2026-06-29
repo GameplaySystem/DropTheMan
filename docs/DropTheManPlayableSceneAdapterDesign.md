@@ -315,6 +315,31 @@ Therefore, the input adapter must convert before calling runtime code.
 
 Use one explicit board interaction plane.
 
+For the first Drop The Man playable scene, the intended board convention is:
+
+```text
+Unity board plane: XZ
+Unity visual height axis: Y
+GridCoordinate.X -> world.x
+GridCoordinate.Y -> world.z
+world.y -> visual height only
+```
+
+Scene input should therefore use a horizontal board plane with normal:
+
+```text
+(0, 1, 0)
+```
+
+The `GridWorldLayout` provided to runtime code should use:
+
+```text
+BoardOrigin = board plane origin
+CellSize = configured board cell size
+BoardXAxis = (1, 0, 0)
+BoardYAxis = (0, 0, 1)
+```
+
 The scene adapter should serialize or otherwise explicitly receive:
 
 * camera reference
@@ -341,6 +366,8 @@ Do not use `Camera.main` implicitly.
 Do not infer gameplay movement from physics after the initial hit-test.
 
 Physics may select a view; the explicit board plane provides drag positions.
+
+Visual object height should be preserved by the view/adapter layer when needed. Runtime board-coordinate conversion must not use world `Y` as a grid coordinate for this XZ scene.
 
 ---
 
@@ -548,6 +575,7 @@ Allowed minimal behavior:
 
 * holes move by directly setting transform position
 * completed holes become unselectable
+* completed holes may hide basic child renderers as a placeholder
 * collecting stickman hook may be no-op or simple hide
 * timer may have no UI
 * terminal outcome may only disable input and log/report result

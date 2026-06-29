@@ -334,6 +334,8 @@ previous accepted position
     ->
 continuous candidate position
     ->
+footprint-aware board-bound candidate clamp
+    ->
 deterministic swept footprint or board-cell overlap evaluation
     ->
 accepted movement applied or clamped
@@ -346,6 +348,14 @@ This prevents:
 * frame-rate-dependent behavior
 
 The sweep should identify every board cell that the moving hole footprint crosses or overlaps along the movement segment.
+
+Board bounds are the only blocker category that may clamp the continuous candidate before the sweep.
+This keeps the full hole footprint inside the board and allows sliding along a board edge when the
+other axis remains valid.
+
+Wrong-color collectibles, occupied cells, reserved cells, blocked cells, and inactive cells still
+block through swept validation. They must not become sliding boundaries unless a later approved
+rule changes that behavior.
 
 Those crossed or overlapped cells are then evaluated deterministically against:
 

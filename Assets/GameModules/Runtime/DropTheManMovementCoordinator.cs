@@ -134,6 +134,11 @@ namespace DropAwayPrototype.Runtime
     /// </summary>
     public sealed class DropTheManMovementCoordinator
     {
+        private static readonly GridCoordinate[] SingleCellOffsets =
+        {
+            new(0, 0)
+        };
+
         private readonly SweptFootprintHelper _sweptFootprintHelper = new();
 
         /// <summary>
@@ -176,11 +181,13 @@ namespace DropAwayPrototype.Runtime
             List<StickmanRuntimeState> newlyCollectingStickmen = new();
             HashSet<GridCoordinate> committedHoleFootprint =
                 BuildCommittedHoleFootprint(request.Hole);
+            Vector3 boundedCandidateWorldPosition =
+                ClampCandidateToBoardBounds(request);
             IReadOnlyList<SweptFootprintContactGroup> contactGroups =
                 _sweptFootprintHelper.EnumerateContactGroups(
                     new SweptFootprintRequest(
                         request.PreviousAcceptedWorldPosition,
-                        request.CandidateWorldPosition,
+                        boundedCandidateWorldPosition,
                         request.WorldLayout,
                         request.Hole.Footprint.Offsets));
 
@@ -254,7 +261,7 @@ namespace DropAwayPrototype.Runtime
             }
 
             return DropTheManMovementCoordinatorResult.Evaluated(
-                request.CandidateWorldPosition,
+                boundedCandidateWorldPosition,
                 false,
                 false,
                 false,
@@ -268,6 +275,51 @@ namespace DropAwayPrototype.Runtime
             // The hole's freeform visual drag position is external to HoleRuntimeState, and
             // structural occupancy is not updated during drag in this slice.
             return new HashSet<GridCoordinate>(hole.ResolveFootprintCoordinates());
+        }
+
+        private static Vector3 ClampCandidateToBoardBounds(
+            DropTheManMovementCoordinatorRequest request)
+        {
+            IReadOnlyList<GridCoordinate> offsets = request.Hole.Footprint.Offsets.Count > 0
+                ? request.Hole.Footprint.Offsets
+                : SingleCellOffsets;
+
+            int minOffsetX = offsets[0].X;
+            int minOffsetY = offsets[0].Y;
+            int maxOffsetXExclusive = offsets[0].X + 1;
+            int maxOffsetYExclusive = offsets[0].Y + 1;
+
+            for (int i = 1; i < offsets.Count; i++)
+            {
+                minOffsetX = Mathf.Min(minOffsetX, offsets[i].X);
+                minOffsetY = Mathf.Min(minOffsetY, offsets[i].Y);
+                maxOffsetXExclusive = Mathf.Max(maxOffsetXExclusive, offsets[i].X + 1);
+                maxOffsetYExclusive = Mathf.Max(maxOffsetYExclusive, offsets[i].Y + 1);
+            }
+
+            float minX = -minOffsetX;
+            float minY = -minOffsetY;
+            float maxX = request.RuntimeModel.FrameworkContext.GridBoard.Width - maxOffsetXExclusive;
+            float maxY = request.RuntimeModel.FrameworkContext.GridBoard.Height - maxOffsetYExclusive;
+
+            if (minX > maxX || minY > maxY)
+            {
+                return request.PreviousAcceptedWorldPosition;
+            }
+
+            BoardLocalContinuousPosition candidate =
+                BoardLocalContinuousPosition.FromWorld(
+                    request.CandidateWorldPosition,
+                    request.WorldLayout);
+            BoardLocalContinuousPosition clampedCandidate =
+                new(
+                    Mathf.Clamp(candidate.X, minX, maxX),
+                    Mathf.Clamp(candidate.Y, minY, maxY));
+
+            Vector3 candidateBoardPlaneWorld = candidate.ToWorld(request.WorldLayout);
+            Vector3 clampedBoardPlaneWorld = clampedCandidate.ToWorld(request.WorldLayout);
+            Vector3 heightOffset = request.CandidateWorldPosition - candidateBoardPlaneWorld;
+            return clampedBoardPlaneWorld + heightOffset;
         }
 
         private static bool TryGetBlockingReason(

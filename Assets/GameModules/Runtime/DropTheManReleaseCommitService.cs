@@ -309,10 +309,7 @@ namespace DropAwayPrototype.Runtime
             GridCoordinate coordinate,
             GridWorldLayout worldLayout)
         {
-            return new Vector3(
-                worldLayout.BoardOrigin.x + (coordinate.X * worldLayout.CellSize.x),
-                worldLayout.BoardOrigin.y + (coordinate.Y * worldLayout.CellSize.y),
-                worldLayout.BoardOrigin.z);
+            return worldLayout.GridToWorldPosition(coordinate);
         }
 
         private static bool ContainsHoleReference(

@@ -17,6 +17,8 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private bool bootstrapOnStart = true;
         [SerializeField] private Vector3 boardWorldOrigin = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
+        [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
+        [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
         [SerializeField] private DropTheManDevLevelData levelData =
             DropTheManDevLevelData.CreateDefault();
 
@@ -103,7 +105,11 @@ namespace DropAwayPrototype.Runtime
             GridWorldLayout worldLayout;
             try
             {
-                worldLayout = new GridWorldLayout(boardWorldOrigin, cellSize);
+                worldLayout = new GridWorldLayout(
+                    boardWorldOrigin,
+                    cellSize,
+                    boardGridXAxis,
+                    boardGridYAxis);
             }
             catch (System.Exception exception)
             {

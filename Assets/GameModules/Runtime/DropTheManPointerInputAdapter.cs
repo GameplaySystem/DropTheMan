@@ -17,13 +17,14 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private LayerMask holeLayerMask = ~0;
         [SerializeField] private float maxHitDistance = 500f;
         [SerializeField] private Transform boardPlaneOrigin;
-        [SerializeField] private Vector3 boardPlaneNormal = Vector3.forward;
+        [SerializeField] private Vector3 boardPlaneNormal = Vector3.up;
         [SerializeField] private Vector3 dragWorldOffset;
         [SerializeField] private bool enableMouseInput = true;
 
         private bool _isDragging;
         private int _activePointerId = -1;
         private int _lastProcessedDragFrame = -1;
+        private Vector3 _activeHoleToPointerWorldOffset;
 
         public bool IsDragging => _isDragging;
 
@@ -83,11 +84,17 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (!TryScreenToBoardWorld(screenPosition, out Vector3 pointerWorldPosition))
+            {
+                return false;
+            }
+
             if (!sceneController.TryBeginDrag(holeView))
             {
                 return false;
             }
 
+            _activeHoleToPointerWorldOffset = holeView.WorldPosition - pointerWorldPosition;
             _isDragging = true;
             _activePointerId = pointerId;
             _lastProcessedDragFrame = -1;
@@ -112,7 +119,8 @@ namespace DropAwayPrototype.Runtime
             }
 
             _lastProcessedDragFrame = Time.frameCount;
-            bool updated = sceneController.TryUpdateDrag(worldPosition);
+            bool updated =
+                sceneController.TryUpdateDrag(worldPosition + _activeHoleToPointerWorldOffset);
             if (!updated || !sceneController.InputEnabled)
             {
                 ClearLocalPointerState();
@@ -152,6 +160,7 @@ namespace DropAwayPrototype.Runtime
             _isDragging = false;
             _activePointerId = -1;
             _lastProcessedDragFrame = -1;
+            _activeHoleToPointerWorldOffset = default;
         }
 
         private bool CanAcceptPointer(int pointerId, bool requireActiveDrag)
@@ -208,7 +217,7 @@ namespace DropAwayPrototype.Runtime
 
             Vector3 normal = boardPlaneNormal.sqrMagnitude > 0f
                 ? boardPlaneNormal.normalized
-                : Vector3.forward;
+                : Vector3.up;
             Vector3 origin = boardPlaneOrigin != null
                 ? boardPlaneOrigin.position
                 : Vector3.zero;

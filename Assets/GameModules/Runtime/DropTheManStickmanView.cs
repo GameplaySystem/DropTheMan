@@ -10,7 +10,8 @@ namespace DropAwayPrototype.Runtime
     public sealed class DropTheManStickmanView : MonoBehaviour, IDropTheManStickmanView
     {
         [SerializeField] private string runtimeId = string.Empty;
-        [SerializeField] private bool hideRenderersOnCollectionStarted;
+        [SerializeField] private bool hideRenderersOnCollectionStarted = true;
+        [SerializeField] private bool disableCollidersOnCollectionStarted = true;
         [SerializeField] private Renderer[] renderersToHide;
         [SerializeField] private Collider[] collidersToDisable;
 
@@ -18,6 +19,19 @@ namespace DropAwayPrototype.Runtime
 
         public string RuntimeId => runtimeId;
         public bool CollectionStarted => _collectionStarted;
+
+        private void Awake()
+        {
+            if (renderersToHide == null || renderersToHide.Length == 0)
+            {
+                renderersToHide = GetComponentsInChildren<Renderer>(includeInactive: true);
+            }
+
+            if (collidersToDisable == null || collidersToDisable.Length == 0)
+            {
+                collidersToDisable = GetComponentsInChildren<Collider>(includeInactive: true);
+            }
+        }
 
         public void OnCollectionStarted(StickmanRuntimeState stickman)
         {
@@ -28,7 +42,7 @@ namespace DropAwayPrototype.Runtime
 
             _collectionStarted = true;
 
-            if (collidersToDisable != null)
+            if (disableCollidersOnCollectionStarted && collidersToDisable != null)
             {
                 for (int i = 0; i < collidersToDisable.Length; i++)
                 {

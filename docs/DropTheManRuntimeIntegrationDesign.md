@@ -200,6 +200,16 @@ For MVP, the bootstrapper may receive explicit serialized references or construc
 * scene stickman views
 * optional timer configuration already present in level data
 
+For the first Drop The Man playable scene, the runtime `GridWorldLayout` should be configured for an XZ board:
+
+```text
+GridCoordinate.X -> world.x
+GridCoordinate.Y -> world.z
+world.y -> visual height only
+```
+
+The framework layout remains generic; the prototype composition root owns choosing XZ axes for this scene.
+
 This design does not require a new level-selection system or content schema.
 
 ### Bootstrapper Creates Or Owns

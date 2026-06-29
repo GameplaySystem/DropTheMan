@@ -13,6 +13,9 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private string runtimeId = string.Empty;
         [SerializeField] private Collider selectionCollider;
         [SerializeField] private bool isSelectable = true;
+        [SerializeField] private bool preserveWorldYOnApply = true;
+        [SerializeField] private bool hideRenderersWhenNotSelectable = true;
+        [SerializeField] private Renderer[] renderersToHideWhenNotSelectable;
 
         public string RuntimeId => runtimeId;
         public Vector3 WorldPosition => transform.position;
@@ -25,11 +28,21 @@ namespace DropAwayPrototype.Runtime
                 TryGetComponent(out selectionCollider);
             }
 
+            if (renderersToHideWhenNotSelectable == null || renderersToHideWhenNotSelectable.Length == 0)
+            {
+                renderersToHideWhenNotSelectable = GetComponentsInChildren<Renderer>(includeInactive: true);
+            }
+
             ApplySelectableState();
         }
 
         public void ApplyWorldPosition(Vector3 worldPosition)
         {
+            if (preserveWorldYOnApply)
+            {
+                worldPosition.y = transform.position.y;
+            }
+
             transform.position = worldPosition;
         }
 
@@ -44,6 +57,19 @@ namespace DropAwayPrototype.Runtime
             if (selectionCollider != null)
             {
                 selectionCollider.enabled = isSelectable;
+            }
+
+            if (!hideRenderersWhenNotSelectable || renderersToHideWhenNotSelectable == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < renderersToHideWhenNotSelectable.Length; i++)
+            {
+                if (renderersToHideWhenNotSelectable[i] != null)
+                {
+                    renderersToHideWhenNotSelectable[i].enabled = isSelectable;
+                }
             }
         }
     }

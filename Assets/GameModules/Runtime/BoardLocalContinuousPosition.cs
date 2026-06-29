@@ -24,10 +24,10 @@ namespace DropAwayPrototype.Runtime
             Vector3 worldPosition,
             GridWorldLayout worldLayout)
         {
-            Vector3 relative = worldPosition - worldLayout.BoardOrigin;
+            Vector2 boardLocalPosition = worldLayout.WorldToBoardLocal(worldPosition);
             return new BoardLocalContinuousPosition(
-                relative.x / worldLayout.CellSize.x,
-                relative.y / worldLayout.CellSize.y);
+                boardLocalPosition.x,
+                boardLocalPosition.y);
         }
 
         public static BoardLocalContinuousPosition Lerp(
@@ -42,10 +42,7 @@ namespace DropAwayPrototype.Runtime
 
         public Vector3 ToWorld(GridWorldLayout worldLayout)
         {
-            return new Vector3(
-                worldLayout.BoardOrigin.x + (X * worldLayout.CellSize.x),
-                worldLayout.BoardOrigin.y + (Y * worldLayout.CellSize.y),
-                worldLayout.BoardOrigin.z);
+            return worldLayout.BoardLocalToWorld(new Vector2(X, Y));
         }
 
         public float DistanceTo(BoardLocalContinuousPosition other)
