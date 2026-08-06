@@ -621,6 +621,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManDevSceneBootstrapper
   sceneController: {fileID: 1055129233}
   bootstrapOnStart: 1
+  levelSource: 1
+  jsonLevelAsset: {fileID: 4900000, guid: 021095c44e7a45e89cc7f5ce5e3f1213, type: 3}
   boardWorldOrigin: {x: 0, y: 0, z: 0}
   cellSize: {x: 1, y: 1}
   boardGridXAxis: {x: 1, y: 0, z: 0}

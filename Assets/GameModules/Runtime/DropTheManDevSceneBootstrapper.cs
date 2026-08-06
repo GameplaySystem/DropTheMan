@@ -15,6 +15,9 @@ namespace DropAwayPrototype.Runtime
     {
         [SerializeField] private DropTheManSceneController sceneController;
         [SerializeField] private bool bootstrapOnStart = true;
+        [SerializeField] private DropTheManDevLevelSource levelSource =
+            DropTheManDevLevelSource.InspectorDevData;
+        [SerializeField] private TextAsset jsonLevelAsset;
         [SerializeField] private Vector3 boardWorldOrigin = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
         [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
@@ -67,7 +70,7 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            DropTheManDevLevelDefinitionProvider provider = new(levelData);
+            IDropTheManLevelDefinitionProvider provider = CreateLevelDefinitionProvider();
             if (!provider.TryGetLevelDefinition(
                     out LevelDefinition levelDefinition,
                     out failureReason))
@@ -134,6 +137,35 @@ namespace DropAwayPrototype.Runtime
             return true;
         }
 
+        [ContextMenu("Log Drop The Man Inspector Level JSON")]
+        public void LogInspectorLevelJson()
+        {
+            if (!TryExportInspectorLevelJson(out string jsonText, out string failureReason))
+            {
+                Debug.LogError(failureReason, this);
+                return;
+            }
+
+            Debug.Log(jsonText, this);
+        }
+
+        public bool TryExportInspectorLevelJson(
+            out string jsonText,
+            out string failureReason)
+        {
+            return DropTheManJsonLevelDefinitionProvider.TryExportDevLevelDataToJson(
+                levelData,
+                out jsonText,
+                out failureReason);
+        }
+
+        private IDropTheManLevelDefinitionProvider CreateLevelDefinitionProvider()
+        {
+            return levelSource == DropTheManDevLevelSource.JsonTextAsset
+                ? new DropTheManJsonLevelDefinitionProvider(jsonLevelAsset)
+                : new DropTheManDevLevelDefinitionProvider(levelData);
+        }
+
         private static bool TryCreateTimer(
             TimerDefinitionData timerDefinition,
             out TimerSystem timerSystem,
@@ -170,6 +202,12 @@ namespace DropAwayPrototype.Runtime
                 failureReason = exception.Message;
                 return false;
             }
+        }
+
+        private enum DropTheManDevLevelSource
+        {
+            InspectorDevData = 0,
+            JsonTextAsset = 1
         }
     }
 }

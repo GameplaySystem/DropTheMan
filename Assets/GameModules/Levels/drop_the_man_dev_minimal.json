@@ -1,0 +1,40 @@
+{
+    "FormatVersion": 1,
+    "LevelId": "drop_the_man_dev_minimal",
+    "DisplayName": "Drop The Man Dev Minimal",
+    "Board": {
+        "Width": 5,
+        "Height": 5
+    },
+    "Timer": {
+        "Enabled": false,
+        "DurationSeconds": 60.0,
+        "WarningThresholdSeconds": 0.0
+    },
+    "Holes": [
+        {
+            "Id": "hole_red_01",
+            "Color": "Red",
+            "Coordinate": {
+                "X": 1,
+                "Y": 2
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                }
+            ]
+        }
+    ],
+    "Stickmen": [
+        {
+            "Id": "stickman_red_01",
+            "Color": "Red",
+            "Coordinate": {
+                "X": 3,
+                "Y": 2
+            }
+        }
+    ]
+}
