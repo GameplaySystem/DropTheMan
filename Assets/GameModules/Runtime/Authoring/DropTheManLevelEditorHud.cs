@@ -1,0 +1,208 @@
+using System.Globalization;
+using DropAwayPrototype.Runtime;
+using UnityEngine;
+
+namespace DropAwayPrototype.Editor
+{
+    /// <summary>
+    /// Lightweight play-mode HUD for the dedicated Drop The Man level editor scene.
+    /// It exposes basic authored metadata and mode feedback without becoming a gameplay UI.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class DropTheManLevelEditorHud : MonoBehaviour
+    {
+        private readonly Rect _panelRect = new(12f, 12f, 400f, 360f);
+
+        private DropTheManLevelEditorRuntimeController _runtimeController;
+        private DropTheManEditorBoardController _boardController;
+        private string _levelIdInput = string.Empty;
+        private string _displayNameInput = string.Empty;
+        private string _boardWidthInput = "5";
+        private string _boardHeightInput = "5";
+        private bool _timerEnabledInput;
+        private string _timerDurationInput = "60";
+        private string _timerWarningInput = "0";
+        private string _statusMessage = string.Empty;
+        private bool _fieldsInitialized;
+
+        public void Bind(
+            DropTheManLevelEditorRuntimeController runtimeController,
+            DropTheManEditorBoardController boardController)
+        {
+            _runtimeController = runtimeController;
+            _boardController = boardController;
+
+            if (!_fieldsInitialized)
+            {
+                SyncEditableFieldsFromBoard();
+            }
+        }
+
+        public void SyncEditableFieldsFromBoard()
+        {
+            if (_boardController == null || _boardController.LevelData == null)
+            {
+                return;
+            }
+
+            DropTheManDevLevelData levelData = _boardController.LevelData;
+            _levelIdInput = levelData.LevelId ?? string.Empty;
+            _displayNameInput = levelData.DisplayName ?? string.Empty;
+            _boardWidthInput = levelData.BoardWidth.ToString(CultureInfo.InvariantCulture);
+            _boardHeightInput = levelData.BoardHeight.ToString(CultureInfo.InvariantCulture);
+            _timerEnabledInput = levelData.TimerEnabled;
+            _timerDurationInput =
+                levelData.TimerDurationSeconds.ToString(CultureInfo.InvariantCulture);
+            _timerWarningInput =
+                levelData.TimerWarningThresholdSeconds.ToString(CultureInfo.InvariantCulture);
+            _fieldsInitialized = true;
+        }
+
+        public bool IsPointerOverHud(Vector2 screenPosition)
+        {
+            Vector2 guiPoint = new(screenPosition.x, Screen.height - screenPosition.y);
+            return _panelRect.Contains(guiPoint);
+        }
+
+        private void OnGUI()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+
+            if (_boardController == null)
+            {
+                GUILayout.BeginArea(_panelRect, GUI.skin.window);
+                GUILayout.Label("Drop The Man Level Editor");
+                GUILayout.Label("Board controller not found.");
+                GUILayout.EndArea();
+                return;
+            }
+
+            if (!_fieldsInitialized)
+            {
+                SyncEditableFieldsFromBoard();
+            }
+
+            DropTheManDevLevelData levelData = _boardController.LevelData;
+
+            GUILayout.BeginArea(_panelRect, GUI.skin.window);
+            GUILayout.Label("Drop The Man Level Editor");
+            GUILayout.Space(4f);
+            GUILayout.Label(
+                $"Mode: {_boardController.CurrentMode}    Color: {_boardController.SelectedColor}");
+            GUILayout.Label(
+                $"Hole palette: {_boardController.ResolveSelectedHolePaletteDisplayName()} ({_boardController.ResolveHolePaletteEntryCount()} configured)");
+            GUILayout.Label(
+                $"Rotation: {_boardController.SelectedHoleRotationDegrees} deg    Holes: {levelData.Holes.Count}    Stickmen: {levelData.Stickmen.Count}");
+            GUILayout.Space(8f);
+
+            GUILayout.Label("Level Id");
+            _levelIdInput = GUILayout.TextField(_levelIdInput);
+            GUILayout.Label("Display Name");
+            _displayNameInput = GUILayout.TextField(_displayNameInput);
+
+            GUILayout.Space(6f);
+            GUILayout.Label("Board Size");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("W", GUILayout.Width(18f));
+            _boardWidthInput = GUILayout.TextField(_boardWidthInput, GUILayout.Width(56f));
+            GUILayout.Label("H", GUILayout.Width(18f));
+            _boardHeightInput = GUILayout.TextField(_boardHeightInput, GUILayout.Width(56f));
+            if (GUILayout.Button("Apply Board", GUILayout.Width(110f)))
+            {
+                ApplyBoardSize();
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(6f);
+            _timerEnabledInput = GUILayout.Toggle(_timerEnabledInput, "Timer Enabled");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Duration", GUILayout.Width(56f));
+            _timerDurationInput = GUILayout.TextField(_timerDurationInput, GUILayout.Width(80f));
+            GUILayout.Label("Warn", GUILayout.Width(40f));
+            _timerWarningInput = GUILayout.TextField(_timerWarningInput, GUILayout.Width(80f));
+            if (GUILayout.Button("Apply Info", GUILayout.Width(110f)))
+            {
+                ApplyMetadataAndTimer();
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8f);
+            GUILayout.Label("Hotkeys: O obstacle, M stickman, H hole, R rotate, 0-9 color");
+            GUILayout.Label("Mouse: Left place, Right erase, Wheel cycle hole palette");
+            GUILayout.Label("This scene authors level data only. Gameplay play/test is separate.");
+
+            if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                GUILayout.Space(6f);
+                GUILayout.Label(_statusMessage);
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private void ApplyBoardSize()
+        {
+            if (!int.TryParse(
+                    _boardWidthInput,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int width) ||
+                !int.TryParse(
+                    _boardHeightInput,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int height))
+            {
+                _statusMessage = "Board width and height must be valid integers.";
+                return;
+            }
+
+            bool changed = _boardController.ApplyBoardDimensions(width, height);
+            SyncEditableFieldsFromBoard();
+            _statusMessage = changed
+                ? $"Board resized to {_boardController.LevelData.BoardWidth} x {_boardController.LevelData.BoardHeight}."
+                : "Board size unchanged.";
+        }
+
+        private void ApplyMetadataAndTimer()
+        {
+            if (string.IsNullOrWhiteSpace(_levelIdInput))
+            {
+                _statusMessage = "Level Id cannot be empty.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_displayNameInput))
+            {
+                _statusMessage = "Display Name cannot be empty.";
+                return;
+            }
+
+            if (!float.TryParse(
+                    _timerDurationInput,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out float durationSeconds) ||
+                !float.TryParse(
+                    _timerWarningInput,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out float warningThresholdSeconds))
+            {
+                _statusMessage = "Timer fields must be valid numbers.";
+                return;
+            }
+
+            _boardController.SetLevelMetadata(_levelIdInput, _displayNameInput);
+            _boardController.SetTimerSettings(
+                _timerEnabledInput,
+                durationSeconds,
+                warningThresholdSeconds);
+            SyncEditableFieldsFromBoard();
+            _statusMessage = "Level metadata and timer fields applied.";
+        }
+    }
+}

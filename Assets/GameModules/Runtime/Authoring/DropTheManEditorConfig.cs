@@ -6,8 +6,8 @@ using UnityEngine;
 namespace DropAwayPrototype.Editor
 {
     /// <summary>
-    /// Prototype-owned authoring configuration for the future Drop The Man level editor.
-    /// This stores editor-time visuals and palette data only; it is not runtime gameplay state.
+    /// Prototype-owned authoring configuration for the scene-based Drop The Man editor shell.
+    /// This stores authoring visuals and palette data only; it is not runtime gameplay state.
     /// </summary>
     [CreateAssetMenu(
         fileName = "DropTheManEditorConfig",

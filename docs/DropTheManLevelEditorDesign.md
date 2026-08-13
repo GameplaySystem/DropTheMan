@@ -7,13 +7,13 @@ This document defines the first concrete `Drop The Man` level editor direction.
 It exists to translate the approved framework `LevelEditorFoundation` design into a
 prototype-owned authoring plan for `DropAwayPrototype`.
 
-This is editor design only.
+This is authoring-tool design only.
 
 It does not implement:
 
-* full visual editor interaction
+* actual gameplay runtime
 * runtime spawning
-* play button behavior
+* gameplay play/test button behavior
 * collection presentation timing
 * animation
 * undo or redo
@@ -26,6 +26,7 @@ It does not implement:
 The framework already documents a generic level editor foundation, but `Drop The Man`
 does not yet have a concrete editor architecture that answers:
 
+* whether the editor is edit-mode tooling or a play-mode authoring scene
 * what the board view should look like
 * how board resizing should behave
 * which placement modes exist
@@ -45,22 +46,24 @@ prototype-specific rules during coding.
 ### Restated Problem
 
 Build the smallest clean authoring foundation for `Drop The Man` without pushing
-puzzle-specific tools into `PuzzleFramework` or accidentally turning editor code into a
-runtime spawning path.
+puzzle-specific tools into `PuzzleFramework`, and without confusing authoring UI with
+either SceneView tooling or actual gameplay runtime.
 
 ### Key Assumptions
 
-* the first editor slice should author data, not playable runtime scene objects
+* the primary editor workflow should run in a dedicated scene while the game is in Play mode
+* the editor should author data, not gameplay runtime state
 * the framework already owns generic authored level structure and JSON persistence
 * `DropAwayPrototype` owns hole, stickman, and blocked-cell authoring meaning
-* play button behavior is not required for this phase
+* actual gameplay play/test behavior is not required for this phase
 * obstacle mode currently means blocked-cell painting, not separate obstacle entities
 
 ### Risks
 
+* SceneView-only tooling can solve the wrong problem if the real workflow is play-mode authoring
 * editor scope can balloon into a full scene tool before data foundations are stable
 * a prototype editor can accidentally hard-code puzzle-specific assumptions into framework code
-* a play button can drag runtime spawning into a content-authoring slice too early
+* gameplay play/test behavior can drag runtime spawning into a content-authoring slice too early
 * board resize can silently destroy authored content unless the rule is explicit
 * color hotkeys can outgrow the current four-color framework enum unless the identity model is widened
 
@@ -76,7 +79,7 @@ Keep using hand-authored JSON and skip editor design until later.
 Rejected because the project now needs a documented editor direction before puzzle-specific
 authoring code expands further.
 
-Add play button and runtime spawning in the same slice.
+Add gameplay play/test behavior and runtime spawning in the same slice.
 
 Rejected because current runtime scene wiring still assumes pre-placed runtime views, and
 spawning is a separate prototype runtime concern.
@@ -92,11 +95,11 @@ generic level editor foundation concepts
     ->
 DropAwayPrototype
     ->
-Drop The Man-specific authoring config and tools
+Drop The Man play-mode authoring scene, runtime input controller, HUD, and config
 ```
 
 For Phase 1, implement only the data and configuration foundations needed before the
-visual placement modes.
+play-mode scene shell.
 
 ---
 
@@ -116,13 +119,16 @@ visual placement modes.
 * stickman authoring
 * blocked-cell painting meaning for `Drop The Man`
 * hole palette data
-* editor hotkeys and authoring modes
+* play-mode authoring hotkeys and modes
 * editor-only hole rotation behavior
 * prototype editor config assets
+* scene-authoring components that must be attachable in Unity scenes
+* runtime play-mode authoring controllers and HUD
+* optional editor-only SceneView wrappers that talk to those components
 
 ### Explicitly Not Owned By This Slice
 
-* play button behavior
+* gameplay play/test behavior
 * runtime spawning from authored data
 * collection timing
 * animation
@@ -142,7 +148,32 @@ authoring assumptions:
 * board cells are shown through an editor cell prefab or equivalent visual settings
 * the default authored board size is `5 x 5`
 * board coordinates remain framework-standard `x, y` cell coordinates
-* board visualization is editor-facing only and must not become runtime gameplay truth
+* board visualization is authoring-facing only and must not become runtime gameplay truth
+
+---
+
+## Primary Workflow
+
+The intended `Drop The Man` level editor workflow is a dedicated authoring scene:
+
+```text
+Open DropTheManLevelEditor scene
+    ->
+Press Play
+    ->
+Use runtime UI and hotkeys to author level data
+```
+
+This is intentionally different from a selected-object SceneView tool.
+
+Approved rule:
+
+* SceneView tooling may exist as optional convenience only
+* the primary workflow is the dedicated play-mode authoring scene
+* authored data remains separate from gameplay runtime state
+
+This keeps the tool aligned with the desired designer workflow without implying that the
+editor scene is also the gameplay scene.
 
 ---
 
@@ -326,6 +357,23 @@ Reason:
 
 ---
 
+## Scene Component Folder Rule
+
+Scene-attachable authoring components and any `ScriptableObject` assets they depend on must live
+outside Unity `Editor` folders so they remain addable and assignable in scenes.
+
+Current Phase 2 interpretation:
+
+* scene-based authoring components live under `Assets/GameModules/Runtime/Authoring/`
+* runtime play-mode authoring components such as `DropTheManLevelEditorRuntimeController` and
+  `DropTheManLevelEditorHud` also live under `Assets/GameModules/Runtime/Authoring/`
+* UnityEditor-only wrappers such as SceneView input, overlay drawing, and undo integration live
+  under `Assets/GameModules/Editor/`
+
+This keeps the current tool scene-based without turning it into a polished `EditorWindow`.
+
+---
+
 ## JSON Save/Load Ownership
 
 The editor authors data.
@@ -364,16 +412,16 @@ Default rule:
 
 ---
 
-## Play Button Decision
+## Gameplay Play/Test Decision
 
-Play button behavior is explicitly out of scope for Phase 1.
+Actual gameplay play/test behavior is explicitly out of scope for the current editor phases.
 
 Reason:
 
 * the current runtime playable-scene path still assumes pre-placed runtime view objects
-* a real play button would drag runtime spawning or a temporary preview-runtime path into this slice
+* a real gameplay play/test button would drag runtime spawning or a temporary preview-runtime path into this slice
 
-If a play button is added later, it should be documented as a separate prototype runtime
+If gameplay play/test is added later, it should be documented as a separate prototype runtime
 integration step.
 
 ---
@@ -392,7 +440,7 @@ Phase 1 should not implement:
 * click placement behavior
 * drag placement behavior
 * board hover previews
-* play button behavior
+* gameplay play/test behavior
 * runtime spawning
 * collection timing
 * animation
@@ -401,15 +449,48 @@ Phase 1 should not implement:
 
 ---
 
+## Phase 2 Scope
+
+Phase 2 implements the first dedicated play-mode authoring scene shell on top of the Phase 1
+data foundation.
+
+Phase 2 should implement:
+
+* a dedicated `DropTheManLevelEditor` scene
+* visible board generation using the configured XZ board convention
+* default `5 x 5` board visualization with authored width and height
+* regeneration when board size changes
+* preservation of in-bounds authored content during resize
+* removal and warning logs for out-of-bounds blocked cells, stickmen, and holes during resize
+* a runtime play-mode input controller
+* a lightweight runtime HUD or debug UI for current mode, color, and authored fields
+* `O`, `M`, and `H` placement modes in Play mode
+* `0` through `9` shared color-slot selection in Play mode
+* obstacle mode blocked-cell painting in Play mode
+* stickman placement using selected color identity and stable unique ids
+* hole placement using selected color identity, configured palette footprints, mouse-scroll
+  palette cycling, editor-only `R` rotation, and footprint overlap rejection
+* small right-click erase behavior
+
+Phase 2 still should not implement:
+
+* gameplay play/test behavior
+* runtime spawning from authored data
+* collection timing
+* animation
+* polished custom editor UX
+* undo or redo
+* framework editor generalization
+
+---
+
 ## Deferred Work
 
 The following are intentionally deferred:
 
-* visual board interaction
-* actual placement mode input handling
 * hole palette preview UX
 * inactive-cell authoring mode
-* play button behavior
+* gameplay play/test behavior
 * runtime view spawning
 * runtime preview scene generation
 * undo or redo
@@ -419,7 +500,9 @@ The following are intentionally deferred:
 
 ## Final Summary
 
-`Drop The Man` editor work should start with data foundations, not with a full scene tool.
+`Drop The Man` editor work should start with data foundations, then expand into a narrow
+prototype-owned play-mode authoring scene without turning into runtime construction or
+actual gameplay runtime.
 
 Phase 1 establishes:
 
@@ -433,5 +516,16 @@ Phase 1 establishes:
 * prototype-owned editor config
 * blocked-cell JSON authoring support
 
-Play button behavior, runtime spawning, and full visual placement interaction remain separate
-future slices.
+Phase 2 adds:
+
+* a dedicated play-mode authoring scene
+* visible checkered board generation in scene
+* resize regeneration with in-bounds preservation and out-of-bounds cleanup reporting
+* runtime hotkey-driven mode and color selection
+* blocked-cell painting in Play mode
+* stickman placement
+* footprint-aware hole placement with palette cycling and editor-only rotation
+* lightweight runtime HUD/debug UI
+* lightweight right-click erasing
+
+Gameplay play/test behavior, runtime spawning, and collection timing remain separate future slices.
