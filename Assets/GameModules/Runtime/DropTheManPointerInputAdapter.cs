@@ -134,7 +134,10 @@ namespace DropAwayPrototype.Runtime
 
             _lastProcessedDragFrame = Time.frameCount;
             bool updated = sceneController.TryUpdateDrag(targetWorldPosition);
-            if (!updated || !sceneController.InputEnabled)
+            if (!updated ||
+                !sceneController.InputEnabled ||
+                sceneController.RuntimeController == null ||
+                !sceneController.HasActiveRuntimeDrag)
             {
                 ClearLocalPointerState();
             }

@@ -4,21 +4,28 @@ using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
-    /// Dev-only bridge that builds a minimal Drop The Man runtime model and initializes
-    /// a pre-wired scene controller. This is not production level loading.
+    /// Dev-only gameplay-scene bridge that builds a Drop The Man runtime model, initializes
+    /// the pre-wired scene controller, and can drive a prototype-only level sequence plus
+    /// temporary result HUD. This is not production level loading or progression.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DropTheManDevSceneBootstrapper : MonoBehaviour
     {
+        private const int ResultWindowId = 104201;
+        private static readonly Rect DefaultResultWindowRect = new(20f, 20f, 260f, 150f);
+
         [SerializeField] private DropTheManSceneController sceneController;
         [SerializeField] private bool bootstrapOnStart = true;
         [SerializeField] private DropTheManDevLevelSource levelSource =
             DropTheManDevLevelSource.InspectorDevData;
         [SerializeField] private TextAsset jsonLevelAsset;
+        [SerializeField] private TextAsset[] levelSequence = Array.Empty<TextAsset>();
+        [SerializeField, Min(0)] private int startingLevelIndex;
         [SerializeField] private Vector3 boardWorldOrigin = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
         [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
@@ -30,6 +37,13 @@ namespace DropAwayPrototype.Runtime
 
         public DropTheManRuntimeModel RuntimeModel { get; private set; }
         public RuntimeLevelContext FrameworkContext { get; private set; }
+
+        private int _currentLevelIndex = -1;
+        private string _currentLevelId = string.Empty;
+        private string _currentDisplayName = string.Empty;
+        private LevelResultState _resultState;
+        private bool _resultWindowVisible;
+        private Rect _resultWindowRect = DefaultResultWindowRect;
 
         private void Awake()
         {
@@ -47,6 +61,47 @@ namespace DropAwayPrototype.Runtime
             }
         }
 
+        private void Update()
+        {
+            if (_resultWindowVisible || sceneController == null)
+            {
+                return;
+            }
+
+            DropTheManRuntimeController controller = sceneController.RuntimeController;
+            if (controller == null || !controller.TerminalOutcomeAccepted)
+            {
+                return;
+            }
+
+            if (controller.CurrentGameState == GameState.Won)
+            {
+                _resultState = LevelResultState.Completed;
+                _resultWindowVisible = true;
+                return;
+            }
+
+            if (controller.CurrentGameState == GameState.Lost)
+            {
+                _resultState = LevelResultState.Failed;
+                _resultWindowVisible = true;
+            }
+        }
+
+        private void OnGUI()
+        {
+            if (!_resultWindowVisible)
+            {
+                return;
+            }
+
+            _resultWindowRect = GUI.Window(
+                ResultWindowId,
+                _resultWindowRect,
+                DrawResultWindow,
+                ResolveResultWindowTitle());
+        }
+
         [ContextMenu("Bootstrap Drop The Man Dev Scene")]
         public void Bootstrap()
         {
@@ -58,24 +113,135 @@ namespace DropAwayPrototype.Runtime
 
         public bool TryBootstrap(out string failureReason)
         {
-            RuntimeModel = null;
-            FrameworkContext = null;
+            if (HasLevelSequence())
+            {
+                if (!CanUseLevelSequence(out failureReason))
+                {
+                    return false;
+                }
+
+                return TryLoadLevelAtIndex(ResolveStartingLevelIndex(), out failureReason);
+            }
+
+            _currentLevelIndex = -1;
+            return TryBootstrapConfiguredSource(out failureReason);
+        }
+
+        /// <summary>
+        /// Reloads the current gameplay level through the same runtime bootstrap path.
+        /// Clean reload currently requires runtime-spawned views.
+        /// </summary>
+        public bool TryRestartCurrentLevel(out string failureReason)
+        {
+            if (!CanReloadCurrentLevel(out failureReason))
+            {
+                return false;
+            }
+
+            if (HasLevelSequence() && IsValidLevelSequenceIndex(_currentLevelIndex))
+            {
+                return TryLoadLevelAtIndex(_currentLevelIndex, out failureReason);
+            }
+
+            return TryBootstrapConfiguredSource(out failureReason);
+        }
+
+        /// <summary>
+        /// Loads the next JSON level from the configured scene-local sequence.
+        /// This remains prototype-owned test-scene flow rather than framework progression.
+        /// </summary>
+        public bool TryLoadNextLevel(out string failureReason)
+        {
+            if (!CanUseLevelSequence(out failureReason))
+            {
+                return false;
+            }
+
+            int nextLevelIndex = _currentLevelIndex + 1;
+            if (!IsValidLevelSequenceIndex(nextLevelIndex))
+            {
+                failureReason = "No next level exists in the configured sequence.";
+                return false;
+            }
+
+            return TryLoadLevelAtIndex(nextLevelIndex, out failureReason);
+        }
+
+        private bool TryLoadLevelAtIndex(int levelIndex, out string failureReason)
+        {
+            if (!HasLevelSequence())
+            {
+                failureReason = "No level sequence is configured.";
+                return false;
+            }
+
+            if (!IsValidLevelSequenceIndex(levelIndex))
+            {
+                failureReason =
+                    $"Level sequence index {levelIndex} is outside the configured range.";
+                return false;
+            }
+
+            TextAsset levelAsset = levelSequence[levelIndex];
+            if (levelAsset == null)
+            {
+                failureReason = $"Level sequence entry {levelIndex} is null.";
+                return false;
+            }
+
+            bool loaded = TryBootstrapFromProvider(
+                new DropTheManJsonLevelDefinitionProvider(levelAsset),
+                out LevelDefinition levelDefinition,
+                out failureReason);
+            if (!loaded)
+            {
+                return false;
+            }
+
+            _currentLevelIndex = levelIndex;
+            CaptureLoadedLevelMetadata(levelDefinition);
+            return true;
+        }
+
+        private bool TryBootstrapConfiguredSource(out string failureReason)
+        {
+            IDropTheManLevelDefinitionProvider provider = CreateLevelDefinitionProvider();
+            bool loaded = TryBootstrapFromProvider(
+                provider,
+                out LevelDefinition levelDefinition,
+                out failureReason);
+            if (!loaded)
+            {
+                return false;
+            }
+
+            CaptureLoadedLevelMetadata(levelDefinition);
+            return true;
+        }
+
+        private bool TryBootstrapFromProvider(
+            IDropTheManLevelDefinitionProvider provider,
+            out LevelDefinition levelDefinition,
+            out string failureReason)
+        {
+            ResetLoadState();
 
             if (sceneController == null)
             {
+                levelDefinition = null;
                 failureReason = "Drop The Man scene controller reference is required.";
                 return false;
             }
 
             if (cellSize.x <= 0f || cellSize.y <= 0f)
             {
+                levelDefinition = null;
                 failureReason = "Dev scene cell size must be positive.";
                 return false;
             }
 
-            IDropTheManLevelDefinitionProvider provider = CreateLevelDefinitionProvider();
             if (!provider.TryGetLevelDefinition(
-                    out LevelDefinition levelDefinition,
+                    out levelDefinition,
                     out failureReason))
             {
                 return false;
@@ -310,6 +476,147 @@ namespace DropAwayPrototype.Runtime
             InspectorDevData = 0,
             JsonTextAsset = 1
         }
+
+        private enum LevelResultState
+        {
+            None = 0,
+            Completed = 1,
+            Failed = 2
+        }
+
+        private void ResetLoadState()
+        {
+            sceneController?.DisableInput();
+            sceneController?.CancelDrag();
+            sceneController?.ClearPointerState();
+
+            RuntimeModel = null;
+            FrameworkContext = null;
+            _resultState = LevelResultState.None;
+            _resultWindowVisible = false;
+        }
+
+        private bool HasLevelSequence()
+        {
+            return levelSequence != null && levelSequence.Length > 0;
+        }
+
+        private int ResolveStartingLevelIndex()
+        {
+            if (!HasLevelSequence())
+            {
+                return -1;
+            }
+
+            return Mathf.Clamp(startingLevelIndex, 0, levelSequence.Length - 1);
+        }
+
+        private bool IsValidLevelSequenceIndex(int levelIndex)
+        {
+            return HasLevelSequence() &&
+                   levelIndex >= 0 &&
+                   levelIndex < levelSequence.Length;
+        }
+
+        private bool HasNextLevel()
+        {
+            return IsValidLevelSequenceIndex(_currentLevelIndex + 1);
+        }
+
+        private bool CanUseLevelSequence(out string failureReason)
+        {
+            if (!HasLevelSequence())
+            {
+                failureReason = "No level sequence is configured.";
+                return false;
+            }
+
+            if (!spawnRuntimeViews)
+            {
+                failureReason =
+                    "Level sequencing requires runtime view spawning so levels can reload cleanly.";
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private bool CanReloadCurrentLevel(out string failureReason)
+        {
+            if (!spawnRuntimeViews)
+            {
+                failureReason =
+                    "Restart requires runtime view spawning because pre-placed views do not yet reset cleanly.";
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private void CaptureLoadedLevelMetadata(LevelDefinition levelDefinition)
+        {
+            _currentLevelId = levelDefinition?.Metadata?.LevelId ?? string.Empty;
+            _currentDisplayName = levelDefinition?.Metadata?.DisplayName ?? _currentLevelId;
+        }
+
+        private string ResolveResultWindowTitle()
+        {
+            return _resultState switch
+            {
+                LevelResultState.Completed => "Level Complete",
+                LevelResultState.Failed => "Level Failed",
+                _ => "Level Result"
+            };
+        }
+
+        private void DrawResultWindow(int windowId)
+        {
+            GUILayout.Label(string.IsNullOrWhiteSpace(_currentDisplayName)
+                ? "Unnamed level"
+                : _currentDisplayName);
+
+            if (!string.IsNullOrWhiteSpace(_currentLevelId))
+            {
+                GUILayout.Label($"Id: {_currentLevelId}");
+            }
+
+            GUILayout.Space(8f);
+
+            if (_resultState == LevelResultState.Completed)
+            {
+                GUI.enabled = HasNextLevel();
+                if (GUILayout.Button(HasNextLevel() ? "Next Level" : "No Next Level"))
+                {
+                    if (!TryLoadNextLevel(out string failureReason))
+                    {
+                        Debug.LogError(failureReason, this);
+                    }
+                }
+
+                GUI.enabled = true;
+                if (GUILayout.Button("Restart"))
+                {
+                    if (!TryRestartCurrentLevel(out string failureReason))
+                    {
+                        Debug.LogError(failureReason, this);
+                    }
+                }
+            }
+            else if (_resultState == LevelResultState.Failed)
+            {
+                if (GUILayout.Button("Restart"))
+                {
+                    if (!TryRestartCurrentLevel(out string failureReason))
+                    {
+                        Debug.LogError(failureReason, this);
+                    }
+                }
+            }
+
+            GUI.DragWindow(new Rect(0f, 0f, 10000f, 20f));
+        }
     }
 
     internal sealed class DropTheManRuntimeLevelViewSpawner
@@ -346,10 +653,10 @@ namespace DropAwayPrototype.Runtime
             }
 
             Transform resolvedRoot = EnsureSpawnRoot(spawnRoot);
-            DestroyChildren(resolvedRoot);
-
             Transform holesRoot = EnsureChildRoot(resolvedRoot, "SpawnedHoleViews");
             Transform stickmenRoot = EnsureChildRoot(resolvedRoot, "SpawnedStickmanViews");
+            DestroyChildren(holesRoot);
+            DestroyChildren(stickmenRoot);
 
             holeTemplate.SetTemplateHidden(true);
             stickmanTemplate.SetTemplateHidden(true);
@@ -363,7 +670,9 @@ namespace DropAwayPrototype.Runtime
                     hole.CurrentCoordinate,
                     holeTemplate.transform.position.y);
 
-                DropTheManHoleView holeView = Object.Instantiate(holeTemplate, holesRoot);
+                DropTheManHoleView holeView = UnityEngine.Object.Instantiate(
+                    holeTemplate,
+                    holesRoot);
                 holeView.name = $"Hole_{hole.Id}";
                 holeView.ConfigureSpawnedView(hole.Id, worldPosition, hole.ColorIdentity);
                 spawnedHoleViews[i] = holeView;
@@ -379,7 +688,7 @@ namespace DropAwayPrototype.Runtime
                     stickmanTemplate.transform.position.y);
 
                 DropTheManStickmanView stickmanView =
-                    Object.Instantiate(stickmanTemplate, stickmenRoot);
+                    UnityEngine.Object.Instantiate(stickmanTemplate, stickmenRoot);
                 stickmanView.name = $"Stickman_{stickman.Id}";
                 stickmanView.ConfigureSpawnedView(
                     stickman.Id,
@@ -436,7 +745,9 @@ namespace DropAwayPrototype.Runtime
         {
             for (int i = root.childCount - 1; i >= 0; i--)
             {
-                Object.Destroy(root.GetChild(i).gameObject);
+                GameObject child = root.GetChild(i).gameObject;
+                child.SetActive(false);
+                UnityEngine.Object.Destroy(child);
             }
         }
     }

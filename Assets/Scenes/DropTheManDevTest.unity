@@ -377,6 +377,8 @@ MonoBehaviour:
   preserveWorldYOnApply: 1
   hideRenderersWhenNotSelectable: 1
   renderersToHideWhenNotSelectable: []
+  destroySpawnedViewOnCompleted: 1
+  spawnedViewScaleMultiplier: 0.88
 --- !u!65 &690232120
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -522,6 +524,7 @@ MonoBehaviour:
   startGameplayOnInitialize: 1
   tickTimerInUpdate: 1
   collectionTriggerRadiusInCells: 0.35
+  dragClearanceInsetCells: 0.08
 --- !u!1 &1823423590
 GameObject:
   m_ObjectHideFlags: 0
@@ -575,6 +578,7 @@ MonoBehaviour:
   boardPlaneOrigin: {fileID: 458836034}
   boardPlaneNormal: {x: 0, y: 1, z: 0}
   dragWorldOffset: {x: 0, y: 0, z: 0}
+  maxDragSpeedUnitsPerSecond: 12
   enableMouseInput: 1
 --- !u!1 &1835765698
 GameObject:
@@ -623,7 +627,11 @@ MonoBehaviour:
   sceneController: {fileID: 1055129233}
   bootstrapOnStart: 1
   levelSource: 1
-  jsonLevelAsset: {fileID: 4900000, guid: 1a72361f77cd1364882973e9a46e7626, type: 3}
+  jsonLevelAsset: {fileID: 4900000, guid: 8cac185436c3e9c4c88e045655d231a5, type: 3}
+  levelSequence:
+  - {fileID: 4900000, guid: 8cac185436c3e9c4c88e045655d231a5, type: 3}
+  - {fileID: 4900000, guid: 1a72361f77cd1364882973e9a46e7626, type: 3}
+  startingLevelIndex: 0
   boardWorldOrigin: {x: 0, y: 0, z: 0}
   cellSize: {x: 1, y: 1}
   boardGridXAxis: {x: 1, y: 0, z: 0}
@@ -684,6 +692,7 @@ MonoBehaviour:
   runtimeId: stickman_red_01
   hideRenderersOnCollectionStarted: 1
   disableCollidersOnCollectionStarted: 1
+  destroySpawnedViewOnCollectionStarted: 1
   renderersToHide:
   - {fileID: 1838712686}
   collidersToDisable:

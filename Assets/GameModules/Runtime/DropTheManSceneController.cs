@@ -30,6 +30,8 @@ namespace DropAwayPrototype.Runtime
 
         public DropTheManRuntimeController RuntimeController => _runtimeController;
         public bool IsInitialized => _isInitialized;
+        public bool HasActiveRuntimeDrag =>
+            _runtimeController != null && _runtimeController.HasActiveDrag;
         public IReadOnlyList<DropTheManHoleView> HoleViewTemplates =>
             holeViews ?? Array.Empty<DropTheManHoleView>();
         public IReadOnlyList<DropTheManStickmanView> StickmanViewTemplates =>
@@ -149,7 +151,9 @@ namespace DropAwayPrototype.Runtime
             DropTheManRuntimeControllerResult result =
                 _runtimeController.UpdateDragWorldPosition(worldPosition);
             HandleRuntimeResult(result);
-            return result.Success && result.DragUpdated;
+            return result.Success &&
+                   result.DragUpdated &&
+                   HasActiveRuntimeDrag;
         }
 
         public void ReleaseDrag()
@@ -173,6 +177,12 @@ namespace DropAwayPrototype.Runtime
         public void CancelDrag()
         {
             _runtimeController?.CancelDrag();
+            ClearInputOnly();
+        }
+
+        public void ClearPointerState()
+        {
+            ClearInputOnly();
         }
 
         public void EnableInput()

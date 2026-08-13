@@ -80,6 +80,15 @@ Phase 4A addendum:
 * spawned views still remain presentation/input adapters only; runtime state stays gameplay
   authority
 
+Phase 4B addendum:
+
+* the dev gameplay bootstrapper may also own a prototype-only serialized `TextAsset[]`
+  level sequence plus current-level index for the gameplay test scene
+* same-scene restart and next-level loading should reuse the existing JSON -> framework build ->
+  runtime model -> runtime view spawn -> scene-controller initialization path
+* a minimal prototype-owned `OnGUI` result window is acceptable for this slice
+* this sequence owner is scene-local gameplay flow, not framework progression
+
 ---
 
 ## Architecture Review
@@ -720,9 +729,9 @@ This design does not include:
 * scene editing
 * prefab creation
 * animation
-* UI
+* polished UI
 * audio
-* level loading UX
+* production level loading UX
 * progression save updates
 * optional required-hole schema
 * framework event-system use
@@ -733,6 +742,21 @@ This design does not include:
 ## Final Summary
 
 The first playable integration should be a prototype-owned composition layer.
+
+For the current gameplay test scene, a higher-level prototype-owned loop may sit above that
+composition layer to:
+
+```text
+choose a level asset from a serialized sequence
+    ->
+run the existing bootstrap/build/spawn path
+    ->
+observe accepted Won/Lost state
+    ->
+show a temporary OnGUI Restart/Next result window
+```
+
+That loop still must not become framework progression, persistence, or a general content catalog.
 
 It should directly connect:
 

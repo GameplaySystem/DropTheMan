@@ -53,6 +53,15 @@ Phase 4A resolution:
   runtime-spawned views after JSON or dev-data loading succeeds
 * the spawned views then register through the existing scene-controller/runtime-controller path
 
+Phase 4B resolution:
+
+* the gameplay test scene may use a prototype-owned serialized `TextAsset[] levelSequence`
+  controlled by the dev bootstrapper rather than a production catalog
+* terminal `Won` and `Lost` acceptance may now surface through a temporary prototype-owned
+  `OnGUI` result window with `Restart` and `Next Level`
+* restart and next-level flow should rebuild the level through the same runtime-spawn path rather
+  than layering a second scene-loading or object-reset system
+
 ---
 
 ## Assumptions
@@ -79,6 +88,7 @@ This design still defers:
 
 * a polished reusable prefab-asset pipeline
 * editor-to-gameplay test bridging
+* polished Canvas/TMP gameplay-loop UI
 
 ---
 
@@ -585,6 +595,16 @@ if bootstrap succeeds:
 
 This preserves the current warning that runtime model building mutates occupancy and should not be mixed with prefab/view creation rollback.
 
+For the current test-scene loop, a higher-level prototype-owned flow owner may then:
+
+```text
+observe controller.CurrentGameState after terminal acceptance
+    ->
+show temporary Restart / Next controls
+    ->
+call back into the dev bootstrapper to rebuild the selected JSON level
+```
+
 ---
 
 ## Deliberately Unpolished For This Slice
@@ -598,7 +618,7 @@ Allowed minimal behavior:
 * completed holes may hide basic child renderers as a placeholder
 * collecting stickman hook may be no-op or simple hide
 * timer may have no UI
-* terminal outcome may only disable input and log/report result
+* terminal outcome may disable input and surface through a temporary `OnGUI` result window
 * startup failure may log a direct error
 * runtime spawning may clone scene-local templates instead of dedicated prefab assets for now
 
@@ -608,9 +628,9 @@ Deliberately not included:
 * stickman collection animation
 * DOTween / Animator behavior
 * particles, audio, haptics, or visual feedback framework
-* win/loss UI
+* polished win/loss UI
 * scene transition
-* level progression
+* player progression save/unlock behavior
 * prefab spawning
 * scene object destruction as gameplay truth
 * generic event bus

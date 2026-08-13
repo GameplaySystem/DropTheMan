@@ -407,9 +407,18 @@ namespace DropAwayPrototype.Runtime
                 fullHoleCompletionResult.HoleCompleted &&
                 fullHoleCompletionResult.ShouldNotifyHoleCompleted)
             {
+                string completedHoleId = fullHoleCompletionResult.HoleId;
+                bool completedHoleWasActiveDrag =
+                    string.Equals(_activeHoleId, completedHoleId, StringComparison.Ordinal);
+
+                if (completedHoleWasActiveDrag)
+                {
+                    CancelActiveDragWithoutReleaseCommit();
+                }
+
                 DropTheManViewRegistryResult selectableResult =
                     _viewRegistry.SetHoleSelectable(
-                        fullHoleCompletionResult.HoleId,
+                        completedHoleId,
                         false);
                 if (!selectableResult.Success)
                 {

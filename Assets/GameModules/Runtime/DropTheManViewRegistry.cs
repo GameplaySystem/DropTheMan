@@ -166,6 +166,13 @@ namespace DropAwayPrototype.Runtime
                     $"No hole view is registered for runtime id '{runtimeId}'.");
             }
 
+            if (view is UnityEngine.Object unityObject && unityObject == null)
+            {
+                _holeViews.Remove(runtimeId);
+                return DropTheManViewRegistryResult.Failed(
+                    $"Hole view '{runtimeId}' was destroyed before its world position could be applied.");
+            }
+
             view.ApplyWorldPosition(worldPosition);
             return DropTheManViewRegistryResult.Successful();
         }
@@ -178,6 +185,13 @@ namespace DropAwayPrototype.Runtime
             {
                 return DropTheManViewRegistryResult.Failed(
                     $"No hole view is registered for runtime id '{runtimeId}'.");
+            }
+
+            if (view is UnityEngine.Object unityObject && unityObject == null)
+            {
+                _holeViews.Remove(runtimeId);
+                return DropTheManViewRegistryResult.Failed(
+                    $"Hole view '{runtimeId}' was destroyed before its selectable state could be updated.");
             }
 
             view.SetSelectable(isSelectable);
@@ -196,6 +210,13 @@ namespace DropAwayPrototype.Runtime
             {
                 return DropTheManViewRegistryResult.Failed(
                     $"No stickman view is registered for runtime id '{stickman.Id}'.");
+            }
+
+            if (view is UnityEngine.Object unityObject && unityObject == null)
+            {
+                _stickmanViews.Remove(stickman.Id);
+                return DropTheManViewRegistryResult.Failed(
+                    $"Stickman view '{stickman.Id}' was destroyed before collection presentation could start.");
             }
 
             view.OnCollectionStarted(stickman);
