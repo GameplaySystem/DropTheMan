@@ -335,7 +335,11 @@ DropTheManDragSessionUpdateResult.NewlyCollectingStickmen
     ->
 registry finds each stickman view
     ->
-view may start deferred collection presentation
+view starts collection presentation
+    ->
+current placeholder returns synchronously
+    ->
+drag-session owner converts the reserved slot into fill
 ```
 
 Full-hole completion:
@@ -415,6 +419,8 @@ apply returned authoritative world position to the active hole view
     ->
 start collection presentation for newly collecting stickmen
     ->
+report synchronous placeholder completion to the drag-session owner
+    ->
 if full-hole completion result reports a completed hole, route it to outcome router
 ```
 
@@ -473,44 +479,43 @@ The drag flow should preserve the existing service boundaries.
 
 ### Drag-Time Collection
 
-Collection remains inside:
+Collection reservation and trigger evaluation remain inside:
 
 ```text
 DropTheManMovementCoordinator
 ```
 
-The integration layer only observes:
+The integration layer observes:
 
 ```text
 NewlyCollectingStickmen
 ```
 
-and forwards those runtime states to views for presentation.
+and forwards those runtime states to views for presentation. When the current synchronous
+placeholder hook returns, integration explicitly reports presentation completion to the
+drag-session owner so the reserved slot can become filled.
 
 The integration layer must not re-check color matching or collection acceptance.
 
 ### Full-Hole Completion
 
-Full-hole completion already starts inside:
+Full-hole completion starts inside:
 
 ```text
-DropTheManDragSessionOwner.UpdateDrag(...)
+DropTheManDragSessionOwner.CompleteCollectionPresentation(...)
 ```
 
-when the movement coordinator returns:
+after the triggered placeholder presentation returns and capacity fill makes the hole `Full`.
+This still happens in the controller call handling the accepted drag input sample; release remains
+outside the collection and full-hole path.
 
-```text
-ShouldStopDragging == true
-HoleBecameFull == true
-```
-
-The integration layer should consume the returned:
+The completion call returns:
 
 ```text
 DropTheManFullHoleCompletionResult
 ```
 
-and route successful completed-hole facts to:
+The integration layer routes successful completed-hole facts to:
 
 ```text
 DropTheManOutcomeRouter.HandleHoleCompleted(...)

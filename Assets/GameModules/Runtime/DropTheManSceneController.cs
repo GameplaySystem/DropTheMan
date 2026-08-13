@@ -17,6 +17,7 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private DropTheManPointerInputAdapter pointerInputAdapter;
         [SerializeField] private bool startGameplayOnInitialize = true;
         [SerializeField] private bool tickTimerInUpdate = true;
+        [SerializeField, Min(0.01f)] private float collectionTriggerRadiusInCells = 0.35f;
 
         private DropTheManRuntimeController _runtimeController;
         private bool _isInitialized;
@@ -73,7 +74,8 @@ namespace DropAwayPrototype.Runtime
                     worldLayout,
                     holeViews,
                     stickmanViews,
-                    timerSystem);
+                    timerSystem,
+                    collectionTriggerRadiusInCells);
 
             if (!bootstrapResult.Success)
             {

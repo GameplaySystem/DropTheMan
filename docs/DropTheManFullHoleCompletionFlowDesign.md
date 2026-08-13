@@ -33,8 +33,8 @@ Read alongside:
 
 The current runtime flow already supports:
 
-* drag-time collection
-* immediate transition to `Full`
+* drag-time collection reservation and visual trigger evaluation
+* transition to `Full` after triggered collection presentation completes and capacity fills
 * immediate stop of normal dragging
 * non-full release snap and occupancy commit
 
@@ -296,13 +296,14 @@ Completed
 
 Recommended MVP sequencing:
 
-1. Movement coordinator makes the hole `Full`.
-2. Drag-session owner stops normal dragging immediately.
-3. Drag-session owner calls the full-hole completion service immediately.
-4. Completion service releases the old committed occupancy footprint.
-5. Completion service calls `BeginClosing()`.
-6. MVP completion service immediately calls `MarkCompleted()`.
-7. Completion result reports that the hole completed now.
+1. Movement coordinator reserves a valid target and later triggers it at the configured threshold.
+2. The collection presentation completes and its reserved capacity slot becomes filled.
+3. If fill count reaches capacity, the drag-session owner makes the hole `Full` and stops normal dragging immediately.
+4. Drag-session owner calls the full-hole completion service immediately.
+5. Completion service releases the old committed occupancy footprint.
+6. Completion service calls `BeginClosing()`.
+7. MVP completion service immediately calls `MarkCompleted()`.
+8. Completion result reports that the hole completed now.
 
 This keeps the explicit `Closing` state in the sequence without requiring an asynchronous callback path yet.
 

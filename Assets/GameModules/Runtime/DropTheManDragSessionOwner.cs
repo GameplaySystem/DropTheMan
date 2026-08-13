@@ -61,6 +61,7 @@ namespace DropAwayPrototype.Runtime
             bool sessionIsActive,
             bool shouldStopDragging,
             bool holeBecameFull,
+            IReadOnlyList<StickmanRuntimeState> newlyReservedStickmen,
             IReadOnlyList<StickmanRuntimeState> newlyCollectingStickmen,
             DropTheManFullHoleCompletionResult fullHoleCompletionResult,
             string failureReason)
@@ -70,6 +71,8 @@ namespace DropAwayPrototype.Runtime
             SessionIsActive = sessionIsActive;
             ShouldStopDragging = shouldStopDragging;
             HoleBecameFull = holeBecameFull;
+            NewlyReservedStickmen = newlyReservedStickmen ??
+                                     Array.Empty<StickmanRuntimeState>();
             NewlyCollectingStickmen = newlyCollectingStickmen ??
                                       Array.Empty<StickmanRuntimeState>();
             FullHoleCompletionResult = fullHoleCompletionResult;
@@ -81,10 +84,11 @@ namespace DropAwayPrototype.Runtime
         public bool SessionIsActive { get; }
         public bool ShouldStopDragging { get; }
         public bool HoleBecameFull { get; }
+        public IReadOnlyList<StickmanRuntimeState> NewlyReservedStickmen { get; }
         public IReadOnlyList<StickmanRuntimeState> NewlyCollectingStickmen { get; }
         /// <summary>
-        /// Explicit full-hole completion result for the current update.
-        /// Non-full updates return a NotTriggered result.
+        /// Compatibility field from the immediate-fill flow. The collection-timing path reports
+        /// full completion through DropTheManCollectionPresentationCompletionResult instead.
         /// </summary>
         public DropTheManFullHoleCompletionResult FullHoleCompletionResult { get; }
         public string FailureReason { get; }
@@ -94,6 +98,7 @@ namespace DropAwayPrototype.Runtime
             bool sessionIsActive,
             bool shouldStopDragging,
             bool holeBecameFull,
+            IList<StickmanRuntimeState> newlyReservedStickmen,
             IList<StickmanRuntimeState> newlyCollectingStickmen,
             DropTheManFullHoleCompletionResult fullHoleCompletionResult)
         {
@@ -103,6 +108,9 @@ namespace DropAwayPrototype.Runtime
                 sessionIsActive,
                 shouldStopDragging,
                 holeBecameFull,
+                new ReadOnlyCollection<StickmanRuntimeState>(
+                    new List<StickmanRuntimeState>(
+                        newlyReservedStickmen ?? throw new ArgumentNullException(nameof(newlyReservedStickmen)))),
                 new ReadOnlyCollection<StickmanRuntimeState>(
                     new List<StickmanRuntimeState>(
                         newlyCollectingStickmen ?? throw new ArgumentNullException(nameof(newlyCollectingStickmen)))),
@@ -121,12 +129,14 @@ namespace DropAwayPrototype.Runtime
                 false,
                 false,
                 Array.Empty<StickmanRuntimeState>(),
+                Array.Empty<StickmanRuntimeState>(),
                 DropTheManFullHoleCompletionResult.NotTriggered(),
                 failureReason);
         }
 
         public static DropTheManDragSessionUpdateResult FailedAfterFullHoleStop(
             Vector3 authoritativeWorldPosition,
+            IList<StickmanRuntimeState> newlyReservedStickmen,
             IList<StickmanRuntimeState> newlyCollectingStickmen,
             DropTheManFullHoleCompletionResult fullHoleCompletionResult,
             string failureReason)
@@ -139,9 +149,83 @@ namespace DropAwayPrototype.Runtime
                 true,
                 new ReadOnlyCollection<StickmanRuntimeState>(
                     new List<StickmanRuntimeState>(
+                        newlyReservedStickmen ?? throw new ArgumentNullException(nameof(newlyReservedStickmen)))),
+                new ReadOnlyCollection<StickmanRuntimeState>(
+                    new List<StickmanRuntimeState>(
                         newlyCollectingStickmen ?? throw new ArgumentNullException(nameof(newlyCollectingStickmen)))),
                 fullHoleCompletionResult,
                 failureReason);
+        }
+    }
+
+    /// <summary>
+    /// Result for converting one synchronously completed collection presentation into fill.
+    /// Full-hole completion remains an explicit nested result for outcome routing.
+    /// </summary>
+    public readonly struct DropTheManCollectionPresentationCompletionResult
+    {
+        private DropTheManCollectionPresentationCompletionResult(
+            bool success,
+            bool holeBecameFull,
+            string holeId,
+            string stickmanId,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+            string failureReason)
+        {
+            Success = success;
+            HoleBecameFull = holeBecameFull;
+            HoleId = holeId ?? string.Empty;
+            StickmanId = stickmanId ?? string.Empty;
+            FullHoleCompletionResult = fullHoleCompletionResult;
+            FailureReason = failureReason ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public bool HoleBecameFull { get; }
+        public string HoleId { get; }
+        public string StickmanId { get; }
+        public DropTheManFullHoleCompletionResult FullHoleCompletionResult { get; }
+        public string FailureReason { get; }
+
+        public static DropTheManCollectionPresentationCompletionResult Completed(
+            HoleRuntimeState hole,
+            StickmanRuntimeState stickman,
+            bool holeBecameFull,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult)
+        {
+            return new DropTheManCollectionPresentationCompletionResult(
+                true,
+                holeBecameFull,
+                hole.Id,
+                stickman.Id,
+                fullHoleCompletionResult,
+                string.Empty);
+        }
+
+        public static DropTheManCollectionPresentationCompletionResult Failed(
+            string failureReason)
+        {
+            return new DropTheManCollectionPresentationCompletionResult(
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                DropTheManFullHoleCompletionResult.NotTriggered(),
+                failureReason);
+        }
+
+        public static DropTheManCollectionPresentationCompletionResult FailedAfterFull(
+            HoleRuntimeState hole,
+            StickmanRuntimeState stickman,
+            DropTheManFullHoleCompletionResult fullHoleCompletionResult)
+        {
+            return new DropTheManCollectionPresentationCompletionResult(
+                false,
+                true,
+                hole.Id,
+                stickman.Id,
+                fullHoleCompletionResult,
+                fullHoleCompletionResult.FailureReason);
         }
     }
 
@@ -307,7 +391,9 @@ namespace DropAwayPrototype.Runtime
         /// session so accidental preview or double-apply misuse does not fan out across the codebase.
         /// The caller remains responsible for not submitting the same pointer sample twice.
         /// </summary>
-        public DropTheManDragSessionUpdateResult UpdateDrag(Vector3 candidateWorldPosition)
+        public DropTheManDragSessionUpdateResult UpdateDrag(
+            Vector3 candidateWorldPosition,
+            float collectionTriggerRadiusInCells)
         {
             if (!_isSessionActive || _activeHole == null || _runtimeModel == null)
             {
@@ -323,7 +409,8 @@ namespace DropAwayPrototype.Runtime
                         _activeHole,
                         PreviousAcceptedWorldPosition,
                         candidateWorldPosition,
-                        _worldLayout));
+                        _worldLayout,
+                        collectionTriggerRadiusInCells));
 
             PreviousAcceptedWorldPosition = coordinatorResult.AuthoritativeWorldPosition;
 
@@ -340,28 +427,6 @@ namespace DropAwayPrototype.Runtime
             {
                 _isSessionActive = false;
                 _sessionEndedBecauseHoleBecameFull = coordinatorResult.HoleBecameFull;
-
-                if (coordinatorResult.HoleBecameFull)
-                {
-                    DropTheManFullHoleCompletionResult completionResult =
-                        _fullHoleCompletionService.CompleteFullHole(_runtimeModel, _activeHole);
-
-                    return completionResult.Success
-                        ? DropTheManDragSessionUpdateResult.Evaluated(
-                            PreviousAcceptedWorldPosition,
-                            _isSessionActive,
-                            true,
-                            true,
-                            coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
-                            new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
-                            completionResult)
-                        : DropTheManDragSessionUpdateResult.FailedAfterFullHoleStop(
-                            PreviousAcceptedWorldPosition,
-                            coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
-                            new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
-                            completionResult,
-                            completionResult.FailureReason);
-                }
             }
 
             return DropTheManDragSessionUpdateResult.Evaluated(
@@ -369,9 +434,77 @@ namespace DropAwayPrototype.Runtime
                 _isSessionActive,
                 coordinatorResult.ShouldStopDragging,
                 coordinatorResult.HoleBecameFull,
+                coordinatorResult.NewlyReservedStickmen as IList<StickmanRuntimeState> ??
+                new List<StickmanRuntimeState>(coordinatorResult.NewlyReservedStickmen),
                 coordinatorResult.NewlyCollectingStickmen as IList<StickmanRuntimeState> ??
                 new List<StickmanRuntimeState>(coordinatorResult.NewlyCollectingStickmen),
                 DropTheManFullHoleCompletionResult.NotTriggered());
+        }
+
+        /// <summary>
+        /// Converts one triggered collection into fill after its presentation hook returns.
+        /// The current placeholder is synchronous; a future animation slice may defer this call.
+        /// </summary>
+        public DropTheManCollectionPresentationCompletionResult CompleteCollectionPresentation(
+            StickmanRuntimeState stickman)
+        {
+            if (_activeHole == null || _runtimeModel == null)
+            {
+                return DropTheManCollectionPresentationCompletionResult.Failed(
+                    "No drag session exists for collection presentation completion.");
+            }
+
+            if (stickman == null ||
+                !ContainsStickmanReference(_runtimeModel.Stickmen, stickman))
+            {
+                return DropTheManCollectionPresentationCompletionResult.Failed(
+                    "Collection presentation stickman is not part of the active runtime model.");
+            }
+
+            if (stickman.LifecycleState != StickmanLifecycleState.Collecting ||
+                !string.Equals(
+                    stickman.ReservedHoleId,
+                    _activeHole.Id,
+                    StringComparison.Ordinal))
+            {
+                return DropTheManCollectionPresentationCompletionResult.Failed(
+                    $"Stickman '{stickman.Id}' is not collecting for active hole '{_activeHole.Id}'.");
+            }
+
+            if (!_activeHole.TryCompleteReservedCollectible())
+            {
+                return DropTheManCollectionPresentationCompletionResult.Failed(
+                    $"Hole '{_activeHole.Id}' could not convert a reserved slot into fill.");
+            }
+
+            stickman.MarkCollected();
+
+            bool holeBecameFull =
+                _activeHole.LifecycleState == HoleLifecycleState.Full;
+            if (!holeBecameFull)
+            {
+                return DropTheManCollectionPresentationCompletionResult.Completed(
+                    _activeHole,
+                    stickman,
+                    false,
+                    DropTheManFullHoleCompletionResult.NotTriggered());
+            }
+
+            _isSessionActive = false;
+            _sessionEndedBecauseHoleBecameFull = true;
+            DropTheManFullHoleCompletionResult completionResult =
+                _fullHoleCompletionService.CompleteFullHole(_runtimeModel, _activeHole);
+
+            return completionResult.Success
+                ? DropTheManCollectionPresentationCompletionResult.Completed(
+                    _activeHole,
+                    stickman,
+                    true,
+                    completionResult)
+                : DropTheManCollectionPresentationCompletionResult.FailedAfterFull(
+                    _activeHole,
+                    stickman,
+                    completionResult);
         }
 
         /// <summary>
@@ -449,6 +582,21 @@ namespace DropAwayPrototype.Runtime
             for (int i = 0; i < holes.Count; i++)
             {
                 if (ReferenceEquals(holes[i], hole))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsStickmanReference(
+            IReadOnlyList<StickmanRuntimeState> stickmen,
+            StickmanRuntimeState stickman)
+        {
+            for (int i = 0; i < stickmen.Count; i++)
+            {
+                if (ReferenceEquals(stickmen[i], stickman))
                 {
                     return true;
                 }

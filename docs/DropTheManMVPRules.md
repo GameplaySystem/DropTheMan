@@ -38,7 +38,7 @@ The first playable slice uses these simplifying assumptions:
 * stickmen are single-cell objects
 * hole capacity is part of the first slice
 * queue, buffer, pathfinding, and progression remain out of scope
-* collection is evaluated during drag when a matching target cell is entered
+* collection eligibility and reservation are evaluated during drag when a matching target cell is entered
 
 These assumptions match the approved MVP narrowing decisions.
 
@@ -58,7 +58,9 @@ Approved prototype interpretation:
 * structural occupancy blocks hole placement only where placement should truly fail
 * stickmen are tracked separately as collectible targets addressable by coordinate
 * prototype-owned rule queries may still treat some stickman coordinates as non-enterable for a specific hole
-* collection checks happen during drag when a color-compatible target cell is entered or overlapped
+* collection reservation happens during drag when a color-compatible target cell is entered or overlapped
+* visual collection starts only when the assigned hole reaches the collection trigger threshold
+* capacity fills after collection presentation completes
 
 This keeps framework occupancy generic while allowing prototype collection behavior.
 
@@ -82,7 +84,12 @@ If target cell is wrong-color for the moving hole:
     ->
 If target cell is same-color for the moving hole:
     overlap is allowed
-    collectible is collected immediately
+    collectible and one capacity slot are reserved immediately
+    ->
+When the hole reaches the collection trigger threshold:
+    placeholder collection presentation starts and completes
+    ->
+Capacity fill is applied
     ->
 Player releases drag
     ->
@@ -129,7 +136,9 @@ For the MVP:
 
 * hole capacity is determined by the current hole shape
 * a hole can collect only until it reaches that capacity
-* when a hole becomes full during drag, it stops movement immediately
+* reservation alone does not increase fill count or make a hole full
+* presentation completion converts a reserved slot into one filled slot
+* when fill count reaches capacity during a drag update, the hole becomes full and stops movement immediately
 * a full hole becomes non-draggable immediately
 * the collected targets finish their collection animation first
 * after target visuals finish, the hole aligns, closes, and disappears

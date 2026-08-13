@@ -24,8 +24,9 @@ namespace DropAwayPrototype.Runtime
     public enum StickmanLifecycleState
     {
         Available = 0,
-        Collecting = 1,
-        Collected = 2
+        Reserved = 1,
+        Collecting = 2,
+        Collected = 3
     }
 
     /// <summary>
@@ -72,9 +73,12 @@ namespace DropAwayPrototype.Runtime
         public ColorIdentity ColorIdentity { get; }
         public HoleLifecycleState LifecycleState { get; private set; }
         public int FillCount { get; private set; }
+        public int ReservedCollectionCount { get; private set; }
         public int Capacity => Footprint.CellCount;
         public bool IsDraggable => LifecycleState == HoleLifecycleState.Active;
-        public bool HasRemainingCapacity => LifecycleState == HoleLifecycleState.Active && FillCount < Capacity;
+        public bool HasUnreservedCapacity =>
+            LifecycleState == HoleLifecycleState.Active &&
+            FillCount + ReservedCollectionCount < Capacity;
 
         /// <summary>
         /// Updates the committed hole board coordinate after a later game-module-approved
@@ -96,16 +100,46 @@ namespace DropAwayPrototype.Runtime
         }
 
         /// <summary>
-        /// Applies one accepted drag-time collection to the hole fill state.
-        /// The hole becomes Full immediately when capacity is reached.
+        /// Reserves one capacity slot after a matching drag-time target is accepted.
+        /// Reservation prevents over-collection but does not fill or complete the hole.
         /// </summary>
-        public bool TryAcceptCollectible()
+        public bool TryReserveCollectible()
         {
-            if (!HasRemainingCapacity)
+            if (!HasUnreservedCapacity)
             {
                 return false;
             }
 
+            ReservedCollectionCount++;
+            return true;
+        }
+
+        /// <summary>
+        /// Rolls back a capacity reservation if the paired stickman reservation cannot be applied.
+        /// </summary>
+        public bool TryCancelReservedCollectible()
+        {
+            if (LifecycleState != HoleLifecycleState.Active || ReservedCollectionCount <= 0)
+            {
+                return false;
+            }
+
+            ReservedCollectionCount--;
+            return true;
+        }
+
+        /// <summary>
+        /// Converts one reserved slot into fill after collection presentation completes.
+        /// The hole becomes Full only when completed presentation has filled every slot.
+        /// </summary>
+        public bool TryCompleteReservedCollectible()
+        {
+            if (LifecycleState != HoleLifecycleState.Active || ReservedCollectionCount <= 0)
+            {
+                return false;
+            }
+
+            ReservedCollectionCount--;
             FillCount++;
             if (FillCount >= Capacity)
             {
@@ -148,8 +182,8 @@ namespace DropAwayPrototype.Runtime
     /// <summary>
     /// Prototype-owned runtime state for a collectible stickman.
     /// Stickmen are tracked separately from structural occupancy blocking.
-    /// A stickman may remain visually present while Collecting, but gameplay truth no longer
-    /// treats it as an active blocking or collectible target once collection begins.
+    /// A stickman remains visually present while Reserved, but gameplay truth no longer treats it
+    /// as an active blocking or collectible target after reservation.
     /// </summary>
     public sealed class StickmanRuntimeState
     {
@@ -179,18 +213,38 @@ namespace DropAwayPrototype.Runtime
         public GridCoordinate Coordinate { get; }
         public ColorIdentity ColorIdentity { get; }
         public StickmanLifecycleState LifecycleState { get; private set; }
+        public string ReservedHoleId { get; private set; } = string.Empty;
         public bool IsCollected => LifecycleState == StickmanLifecycleState.Collected;
 
         /// <summary>
-        /// Marks the stickman as collecting immediately after a matching overlap is accepted.
-        /// This removes blocking without waiting for presentation completion.
+        /// Assigns the stickman to one hole after matching drag-time overlap is accepted.
         /// </summary>
-        public void BeginCollection()
+        public void ReserveFor(string holeId)
         {
+            if (string.IsNullOrWhiteSpace(holeId))
+            {
+                throw new ArgumentException("Reserved hole id is required.", nameof(holeId));
+            }
+
             if (LifecycleState != StickmanLifecycleState.Available)
             {
                 throw new InvalidOperationException(
-                    $"Stickman '{Id}' can only begin collection from the Available state.");
+                    $"Stickman '{Id}' can only be reserved from the Available state.");
+            }
+
+            ReservedHoleId = holeId;
+            LifecycleState = StickmanLifecycleState.Reserved;
+        }
+
+        /// <summary>
+        /// Starts collection presentation after the assigned hole reaches the trigger threshold.
+        /// </summary>
+        public void BeginCollection()
+        {
+            if (LifecycleState != StickmanLifecycleState.Reserved)
+            {
+                throw new InvalidOperationException(
+                    $"Stickman '{Id}' can only begin collection from the Reserved state.");
             }
 
             LifecycleState = StickmanLifecycleState.Collecting;
@@ -204,6 +258,12 @@ namespace DropAwayPrototype.Runtime
             if (LifecycleState == StickmanLifecycleState.Collected)
             {
                 return;
+            }
+
+            if (LifecycleState != StickmanLifecycleState.Collecting)
+            {
+                throw new InvalidOperationException(
+                    $"Stickman '{Id}' can only complete collection from the Collecting state.");
             }
 
             LifecycleState = StickmanLifecycleState.Collected;

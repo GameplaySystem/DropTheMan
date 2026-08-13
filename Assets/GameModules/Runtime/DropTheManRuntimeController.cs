@@ -212,6 +212,7 @@ namespace DropAwayPrototype.Runtime
         private readonly DropTheManOutcomeRouter _outcomeRouter;
         private readonly GameStateSystem _gameStateSystem;
         private readonly TimerSystem _timerSystem;
+        private readonly float _collectionTriggerRadiusInCells;
 
         private string _activeHoleId = string.Empty;
         private bool _terminalOutcomeAccepted;
@@ -223,8 +224,16 @@ namespace DropAwayPrototype.Runtime
             GameStateSystem gameStateSystem,
             DropTheManDragSessionOwner dragSessionOwner = null,
             DropTheManOutcomeRouter outcomeRouter = null,
-            TimerSystem timerSystem = null)
+            TimerSystem timerSystem = null,
+            float collectionTriggerRadiusInCells = 0.35f)
         {
+            if (collectionTriggerRadiusInCells <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(collectionTriggerRadiusInCells),
+                    "Collection trigger radius must be positive.");
+            }
+
             _runtimeModel = runtimeModel ?? throw new ArgumentNullException(nameof(runtimeModel));
             _worldLayout = worldLayout;
             _viewRegistry = viewRegistry ?? throw new ArgumentNullException(nameof(viewRegistry));
@@ -232,6 +241,7 @@ namespace DropAwayPrototype.Runtime
             _dragSessionOwner = dragSessionOwner ?? new DropTheManDragSessionOwner();
             _outcomeRouter = outcomeRouter ?? new DropTheManOutcomeRouter();
             _timerSystem = timerSystem;
+            _collectionTriggerRadiusInCells = collectionTriggerRadiusInCells;
         }
 
         public bool HasActiveDrag => _dragSessionOwner.HasSessionContext;
@@ -345,7 +355,9 @@ namespace DropAwayPrototype.Runtime
             }
 
             DropTheManDragSessionUpdateResult updateResult =
-                _dragSessionOwner.UpdateDrag(candidateWorldPosition);
+                _dragSessionOwner.UpdateDrag(
+                    candidateWorldPosition,
+                    _collectionTriggerRadiusInCells);
 
             DropTheManViewRegistryResult applyResult =
                 _viewRegistry.ApplyHoleWorldPosition(
@@ -362,9 +374,10 @@ namespace DropAwayPrototype.Runtime
                     applyResult.FailureReason);
             }
 
-            DropTheManViewRegistryResult collectionNotifyResult =
-                NotifyCollectingStickmen(updateResult);
-            if (!collectionNotifyResult.Success)
+            if (!TryCompleteTriggeredCollections(
+                    updateResult,
+                    out DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+                    out string collectionFailureReason))
             {
                 CancelActiveDragWithoutReleaseCommit();
                 return DropTheManRuntimeControllerResult.UpdatedDrag(
@@ -372,20 +385,20 @@ namespace DropAwayPrototype.Runtime
                     updateResult.AuthoritativeWorldPosition,
                     false,
                     default,
-                    collectionNotifyResult.FailureReason);
+                    collectionFailureReason);
             }
 
             DropTheManOutcomeRoutingResult outcomeResult = default;
             bool terminalAccepted = false;
             bool outcomeWasHandled = false;
 
-            if (updateResult.FullHoleCompletionResult.Success &&
-                updateResult.FullHoleCompletionResult.HoleCompleted &&
-                updateResult.FullHoleCompletionResult.ShouldNotifyHoleCompleted)
+            if (fullHoleCompletionResult.Success &&
+                fullHoleCompletionResult.HoleCompleted &&
+                fullHoleCompletionResult.ShouldNotifyHoleCompleted)
             {
                 DropTheManViewRegistryResult selectableResult =
                     _viewRegistry.SetHoleSelectable(
-                        updateResult.FullHoleCompletionResult.HoleId,
+                        fullHoleCompletionResult.HoleId,
                         false);
                 if (!selectableResult.Success)
                 {
@@ -400,7 +413,7 @@ namespace DropAwayPrototype.Runtime
 
                 outcomeResult = _outcomeRouter.HandleHoleCompleted(
                     _runtimeModel,
-                    updateResult.FullHoleCompletionResult,
+                    fullHoleCompletionResult,
                     _gameStateSystem);
                 outcomeWasHandled = true;
 
@@ -574,9 +587,13 @@ namespace DropAwayPrototype.Runtime
                 outcomeResult.Reason);
         }
 
-        private DropTheManViewRegistryResult NotifyCollectingStickmen(
-            DropTheManDragSessionUpdateResult updateResult)
+        private bool TryCompleteTriggeredCollections(
+            DropTheManDragSessionUpdateResult updateResult,
+            out DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+            out string failureReason)
         {
+            fullHoleCompletionResult = DropTheManFullHoleCompletionResult.NotTriggered();
+
             for (int i = 0; i < updateResult.NewlyCollectingStickmen.Count; i++)
             {
                 DropTheManViewRegistryResult notifyResult =
@@ -584,11 +601,29 @@ namespace DropAwayPrototype.Runtime
                         updateResult.NewlyCollectingStickmen[i]);
                 if (!notifyResult.Success)
                 {
-                    return notifyResult;
+                    failureReason = notifyResult.FailureReason;
+                    return false;
+                }
+
+                DropTheManCollectionPresentationCompletionResult completionResult =
+                    _dragSessionOwner.CompleteCollectionPresentation(
+                        updateResult.NewlyCollectingStickmen[i]);
+                if (!completionResult.Success)
+                {
+                    failureReason = completionResult.FailureReason;
+                    return false;
+                }
+
+                if (completionResult.HoleBecameFull)
+                {
+                    fullHoleCompletionResult =
+                        completionResult.FullHoleCompletionResult;
+                    break;
                 }
             }
 
-            return DropTheManViewRegistryResult.Successful();
+            failureReason = string.Empty;
+            return true;
         }
 
         private bool CanAcceptInput(out string failureReason)

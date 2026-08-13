@@ -18,7 +18,8 @@ namespace DropAwayPrototype.Runtime
 
     /// <summary>
     /// Minimal scene-side adapter for a pre-placed Drop The Man stickman view.
-    /// Collection is already decided by runtime drag rules before this hook is invoked.
+    /// Collection is reserved by runtime rules and has reached its visual trigger threshold
+    /// before this hook is invoked. The current placeholder completes when this call returns.
     /// </summary>
     public interface IDropTheManStickmanView
     {

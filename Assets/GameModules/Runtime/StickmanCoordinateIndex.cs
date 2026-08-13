@@ -8,8 +8,8 @@ namespace DropAwayPrototype.Runtime
     /// Coordinate-based stickman lookup separate from structural occupancy blocking.
     /// This lets collection target queries coexist with framework-owned placement validation.
     /// This index represents only currently available/blocking collectibles.
-    /// Stickmen that have entered Collecting are intentionally removed immediately even if their
-    /// visuals remain present, so they no longer block movement or collect again.
+    /// Stickmen that have entered Reserved are intentionally removed immediately even though their
+    /// visuals remain present, so they no longer block movement or reserve again.
     /// </summary>
     public sealed class StickmanCoordinateIndex
     {
@@ -63,11 +63,13 @@ namespace DropAwayPrototype.Runtime
 
         /// <summary>
         /// Removes a stickman from the active coordinate index after a higher-level rule owner
-        /// has decided that a matching drag-time overlap should begin collecting it.
-        /// This immediate removal is intentional because Collecting stickmen are non-blocking
-        /// and should not be discovered through the active coordinate lookup anymore.
+        /// accepts a matching drag-time reservation. Reserved stickmen are non-blocking and
+        /// should not be discovered through the active coordinate lookup anymore.
         /// </summary>
-        public bool TryBeginCollection(GridCoordinate coordinate, out StickmanRuntimeState stickman)
+        public bool TryReserve(
+            GridCoordinate coordinate,
+            string holeId,
+            out StickmanRuntimeState stickman)
         {
             if (!_stickmenByCoordinate.TryGetValue(coordinate, out stickman) ||
                 !_stickmenByCoordinate.Remove(coordinate))
@@ -75,7 +77,7 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            stickman.BeginCollection();
+            stickman.ReserveFor(holeId);
             return true;
         }
     }

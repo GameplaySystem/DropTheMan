@@ -4,7 +4,8 @@ namespace DropAwayPrototype.Runtime
 {
     /// <summary>
     /// Minimal pre-placed scene adapter for a Drop The Man stickman.
-    /// Collection is already decided by runtime drag rules before this component is notified.
+    /// Collection eligibility is already decided by runtime rules before this component is
+    /// notified at the visual trigger threshold. The placeholder completes synchronously.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DropTheManStickmanView : MonoBehaviour, IDropTheManStickmanView

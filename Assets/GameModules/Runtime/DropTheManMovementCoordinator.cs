@@ -21,13 +21,15 @@ namespace DropAwayPrototype.Runtime
             HoleRuntimeState hole,
             Vector3 previousAcceptedWorldPosition,
             Vector3 candidateWorldPosition,
-            GridWorldLayout worldLayout)
+            GridWorldLayout worldLayout,
+            float collectionTriggerRadiusInCells)
         {
             RuntimeModel = runtimeModel;
             Hole = hole;
             PreviousAcceptedWorldPosition = previousAcceptedWorldPosition;
             CandidateWorldPosition = candidateWorldPosition;
             WorldLayout = worldLayout;
+            CollectionTriggerRadiusInCells = collectionTriggerRadiusInCells;
         }
 
         public DropTheManRuntimeModel RuntimeModel { get; }
@@ -42,6 +44,7 @@ namespace DropAwayPrototype.Runtime
         /// </summary>
         public Vector3 CandidateWorldPosition { get; }
         public GridWorldLayout WorldLayout { get; }
+        public float CollectionTriggerRadiusInCells { get; }
     }
 
     /// <summary>
@@ -58,6 +61,7 @@ namespace DropAwayPrototype.Runtime
             bool wasBlocked,
             bool shouldStopDragging,
             bool holeBecameFull,
+            IReadOnlyList<StickmanRuntimeState> newlyReservedStickmen,
             IReadOnlyList<StickmanRuntimeState> newlyCollectingStickmen,
             string failureReason)
         {
@@ -66,6 +70,8 @@ namespace DropAwayPrototype.Runtime
             WasBlocked = wasBlocked;
             ShouldStopDragging = shouldStopDragging;
             HoleBecameFull = holeBecameFull;
+            NewlyReservedStickmen = newlyReservedStickmen ??
+                                     Array.Empty<StickmanRuntimeState>();
             NewlyCollectingStickmen = newlyCollectingStickmen ??
                                       Array.Empty<StickmanRuntimeState>();
             FailureReason = failureReason ?? string.Empty;
@@ -84,6 +90,7 @@ namespace DropAwayPrototype.Runtime
         /// </summary>
         public bool ShouldStopDragging { get; }
         public bool HoleBecameFull { get; }
+        public IReadOnlyList<StickmanRuntimeState> NewlyReservedStickmen { get; }
         public IReadOnlyList<StickmanRuntimeState> NewlyCollectingStickmen { get; }
         public string FailureReason { get; }
 
@@ -92,6 +99,7 @@ namespace DropAwayPrototype.Runtime
             bool wasBlocked,
             bool shouldStopDragging,
             bool holeBecameFull,
+            IList<StickmanRuntimeState> newlyReservedStickmen,
             IList<StickmanRuntimeState> newlyCollectingStickmen,
             string failureReason)
         {
@@ -101,6 +109,9 @@ namespace DropAwayPrototype.Runtime
                 wasBlocked,
                 shouldStopDragging,
                 holeBecameFull,
+                new ReadOnlyCollection<StickmanRuntimeState>(
+                    new List<StickmanRuntimeState>(
+                        newlyReservedStickmen ?? throw new ArgumentNullException(nameof(newlyReservedStickmen)))),
                 new ReadOnlyCollection<StickmanRuntimeState>(
                     new List<StickmanRuntimeState>(
                         newlyCollectingStickmen ?? throw new ArgumentNullException(nameof(newlyCollectingStickmen)))),
@@ -118,6 +129,7 @@ namespace DropAwayPrototype.Runtime
                 false,
                 shouldStopDragging,
                 false,
+                Array.Empty<StickmanRuntimeState>(),
                 Array.Empty<StickmanRuntimeState>(),
                 failureReason);
         }
@@ -142,13 +154,12 @@ namespace DropAwayPrototype.Runtime
         private readonly SweptFootprintHelper _sweptFootprintHelper = new();
 
         /// <summary>
-        /// Evaluates one drag update and applies drag-time gameplay truth immediately.
+        /// Evaluates one drag update and applies drag-time reservation and trigger truth.
         /// This is a mutating apply step, not a pure preview query.
         /// Successful execution may:
-        /// - change stickman lifecycle state to Collecting
-        /// - remove stickmen from the active coordinate lookup
-        /// - increment hole fill count
-        /// - transition the hole to Full
+        /// - reserve matching stickmen and remove them from the active coordinate lookup
+        /// - change reserved stickmen to Collecting when the trigger threshold is reached
+        /// Capacity fill and Full transition wait for presentation completion.
         /// The result's authoritative world position is still not committed board state because
         /// release-time snap and occupancy commit are intentionally deferred.
         /// Snap must not trigger collection; collection truth is resolved here during drag.
@@ -178,6 +189,14 @@ namespace DropAwayPrototype.Runtime
                     true);
             }
 
+            if (request.CollectionTriggerRadiusInCells <= 0f)
+            {
+                return DropTheManMovementCoordinatorResult.Failed(
+                    request.PreviousAcceptedWorldPosition,
+                    "Collection trigger radius must be positive.");
+            }
+
+            List<StickmanRuntimeState> newlyReservedStickmen = new();
             List<StickmanRuntimeState> newlyCollectingStickmen = new();
             HashSet<GridCoordinate> committedHoleFootprint =
                 BuildCommittedHoleFootprint(request.Hole);
@@ -202,11 +221,11 @@ namespace DropAwayPrototype.Runtime
                         contactGroup,
                         out string blockingReason))
                 {
-                    return DropTheManMovementCoordinatorResult.Evaluated(
+                    return BuildEvaluatedResult(
+                        request,
                         authoritativeWorldPosition,
                         true,
-                        false,
-                        false,
+                        newlyReservedStickmen,
                         newlyCollectingStickmen,
                         blockingReason);
                 }
@@ -218,17 +237,6 @@ namespace DropAwayPrototype.Runtime
                      candidateIndex < contactGroup.OrderedCandidates.Count;
                      candidateIndex++)
                 {
-                    if (!request.Hole.HasRemainingCapacity)
-                    {
-                        return DropTheManMovementCoordinatorResult.Evaluated(
-                            authoritativeWorldPosition,
-                            false,
-                            true,
-                            request.Hole.LifecycleState == HoleLifecycleState.Full,
-                            newlyCollectingStickmen,
-                            string.Empty);
-                    }
-
                     GridCoordinate coordinate =
                         contactGroup.OrderedCandidates[candidateIndex].Coordinate;
                     if (!request.RuntimeModel.StickmanIndex.TryGet(coordinate, out StickmanRuntimeState stickman) ||
@@ -237,36 +245,125 @@ namespace DropAwayPrototype.Runtime
                         continue;
                     }
 
-                    if (!request.RuntimeModel.StickmanIndex.TryBeginCollection(
+                    if (!request.Hole.HasUnreservedCapacity)
+                    {
+                        return BuildEvaluatedResult(
+                            request,
+                            authoritativeWorldPosition,
+                            true,
+                            newlyReservedStickmen,
+                            newlyCollectingStickmen,
+                            $"Hole '{request.Hole.Id}' has no unreserved capacity for collectible at {coordinate}.");
+                    }
+
+                    if (!request.Hole.TryReserveCollectible())
+                    {
+                        return DropTheManMovementCoordinatorResult.Failed(
+                            authoritativeWorldPosition,
+                            $"Hole '{request.Hole.Id}' could not reserve capacity for stickman '{stickman.Id}'.");
+                    }
+
+                    if (!request.RuntimeModel.StickmanIndex.TryReserve(
                             coordinate,
+                            request.Hole.Id,
                             out stickman))
                     {
+                        request.Hole.TryCancelReservedCollectible();
                         continue;
                     }
 
-                    newlyCollectingStickmen.Add(stickman);
-                    request.Hole.TryAcceptCollectible();
-
-                    if (!request.Hole.IsDraggable)
-                    {
-                        return DropTheManMovementCoordinatorResult.Evaluated(
-                            authoritativeWorldPosition,
-                            false,
-                            true,
-                            true,
-                            newlyCollectingStickmen,
-                            string.Empty);
-                    }
+                    newlyReservedStickmen.Add(stickman);
                 }
             }
 
-            return DropTheManMovementCoordinatorResult.Evaluated(
+            return BuildEvaluatedResult(
+                request,
                 boundedCandidateWorldPosition,
                 false,
-                false,
-                false,
+                newlyReservedStickmen,
                 newlyCollectingStickmen,
                 string.Empty);
+        }
+
+        private static DropTheManMovementCoordinatorResult BuildEvaluatedResult(
+            DropTheManMovementCoordinatorRequest request,
+            Vector3 authoritativeWorldPosition,
+            bool wasBlocked,
+            IList<StickmanRuntimeState> newlyReservedStickmen,
+            IList<StickmanRuntimeState> newlyCollectingStickmen,
+            string failureReason)
+        {
+            TriggerReservedStickmen(
+                request,
+                authoritativeWorldPosition,
+                newlyCollectingStickmen);
+
+            return DropTheManMovementCoordinatorResult.Evaluated(
+                authoritativeWorldPosition,
+                wasBlocked,
+                false,
+                false,
+                newlyReservedStickmen,
+                newlyCollectingStickmen,
+                failureReason);
+        }
+
+        private static void TriggerReservedStickmen(
+            DropTheManMovementCoordinatorRequest request,
+            Vector3 authoritativeWorldPosition,
+            ICollection<StickmanRuntimeState> newlyCollectingStickmen)
+        {
+            BoardLocalContinuousPosition holeOrigin =
+                BoardLocalContinuousPosition.FromWorld(
+                    authoritativeWorldPosition,
+                    request.WorldLayout);
+            float thresholdSquared =
+                request.CollectionTriggerRadiusInCells *
+                request.CollectionTriggerRadiusInCells;
+
+            for (int i = 0; i < request.RuntimeModel.Stickmen.Count; i++)
+            {
+                StickmanRuntimeState stickman = request.RuntimeModel.Stickmen[i];
+                if (stickman.LifecycleState != StickmanLifecycleState.Reserved ||
+                    !string.Equals(
+                        stickman.ReservedHoleId,
+                        request.Hole.Id,
+                        StringComparison.Ordinal) ||
+                    !IsWithinCollectionThreshold(
+                        request.Hole,
+                        holeOrigin,
+                        stickman.Coordinate,
+                        thresholdSquared))
+                {
+                    continue;
+                }
+
+                stickman.BeginCollection();
+                newlyCollectingStickmen.Add(stickman);
+            }
+        }
+
+        private static bool IsWithinCollectionThreshold(
+            HoleRuntimeState hole,
+            BoardLocalContinuousPosition holeOrigin,
+            GridCoordinate stickmanCoordinate,
+            float thresholdSquared)
+        {
+            IReadOnlyList<GridCoordinate> offsets = hole.Footprint.Offsets.Count > 0
+                ? hole.Footprint.Offsets
+                : SingleCellOffsets;
+
+            for (int i = 0; i < offsets.Count; i++)
+            {
+                float deltaX = holeOrigin.X + offsets[i].X - stickmanCoordinate.X;
+                float deltaY = holeOrigin.Y + offsets[i].Y - stickmanCoordinate.Y;
+                if (deltaX * deltaX + deltaY * deltaY <= thresholdSquared)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static HashSet<GridCoordinate> BuildCommittedHoleFootprint(HoleRuntimeState hole)

@@ -62,6 +62,7 @@ Collectibles use this state model:
 
 ```text
 Available
+Reserved
 Collecting
 Collected / Removed
 ```
@@ -69,8 +70,9 @@ Collected / Removed
 Rules:
 
 * `Available` collectibles can block or be collected depending on color.
-* Same-color `Available` collectibles can be accepted for collection.
+* Same-color `Available` collectibles can be reserved for collection.
 * Wrong-color `Available` collectibles block movement.
+* `Reserved` collectibles are assigned to one hole, do not block movement, and cannot be reserved again.
 * `Collecting` collectibles do not block movement.
 * `Collecting` collectibles cannot be collected again.
 * `Collected / Removed` collectibles are no longer part of board interaction.
@@ -147,9 +149,15 @@ Allowed.
 
 ### Same-color available collectible
 
-Allowed if the hole has remaining capacity.
+Allowed if the hole has an unfilled, unreserved capacity slot.
 
-Also triggers collection acceptance.
+Also reserves the collectible and one capacity slot for the moving hole.
+
+### Same-color reserved collectible
+
+Allowed.
+
+Does not reserve or collect again. Its visual collection starts only when its assigned hole reaches the configured trigger threshold.
 
 ### Same-color collecting collectible
 
@@ -189,27 +197,36 @@ Examples:
 plus hole -> capacity 5
 ```
 
-When a same-color collectible is accepted:
+When a same-color collectible is accepted during drag:
 
 ```text
-hole fill count increases immediately
-collectible enters Collecting immediately
+collectible enters Reserved immediately
+one hole capacity slot is reserved immediately
+hole fill count does not increase yet
 ```
 
-The fill count does not wait for animation completion.
+When the assigned hole reaches the collection trigger threshold:
 
-Animation completion may finalize visual removal, but gameplay capacity changes at acceptance time.
+```text
+Reserved -> Collecting
+presentation starts
+presentation completes
+Collecting -> Collected / Removed
+reserved slot becomes one filled slot
+```
+
+The first playable placeholder completes presentation synchronously after hiding the stickman. Real animation may make that completion asynchronous later, but it must not decide whether reservation was valid.
 
 ---
 
-## Immediate Non-Blocking Collection Rule
+## Immediate Non-Blocking Reservation Rule
 
-When a collectible is accepted for collection:
+When a collectible is accepted for collection eligibility during drag:
 
 ```text
 Available
     ->
-Collecting
+Reserved
 ```
 
 it immediately stops blocking movement and must not be collectible again.
@@ -217,36 +234,45 @@ it immediately stops blocking movement and must not be collectible again.
 Correct rule:
 
 ```text
-collection accepted
+collection reserved
     ->
-collectible enters Collecting immediately
+collectible enters Reserved immediately
     ->
 cell no longer blocks movement
     ->
-animation plays
+assigned hole reaches trigger threshold
     ->
-animation completion finalizes removal
+collectible enters Collecting
+    ->
+presentation plays and completes
+    ->
+collectible becomes Collected / Removed
+    ->
+hole fill count increases
 ```
 
-Animation is visual only.
+Reservation and enterability remain runtime gameplay truth. Presentation completion is an explicit sequencing fact that gates capacity fill; physics or animation callbacks must not decide collection eligibility.
 
-Gameplay truth must not depend on animation timing.
+A reservation remains assigned to its hole across a non-full release. Release snap neither triggers nor cancels collection. If the threshold was not reached, dragging the same hole again may trigger that reserved target later.
 
 ---
 
 ## Over-Capacity Handling
 
-If one swept movement segment or footprint overlap finds more same-color available collectibles than the hole has remaining capacity, process candidates in deterministic order.
+If one swept movement segment or footprint overlap finds more same-color available collectibles than the hole has unfilled and unreserved capacity slots, process candidates in deterministic order.
 
 Rule:
 
 ```text
-Collect candidates one by one until remaining capacity reaches zero.
-As soon as capacity reaches zero:
-    - mark the hole Full
-    - stop accepting further collectibles
+Reserve candidates one by one until remaining unreserved capacity reaches zero.
+As soon as no unreserved slot remains:
+    - stop accepting further reservations
     - stop further movement traversal
-    - begin completion or closing flow
+    - keep already reserved collectibles assigned and non-blocking
+After each reserved collectible completes presentation:
+    - convert its reserved slot into one filled slot
+    - mark the hole Full only when fill count reaches capacity
+    - begin completion or closing flow from that drag update
 ```
 
 Any unprocessed collectibles remain `Available`.
@@ -380,11 +406,13 @@ For each accepted drag update:
    * not blocked structurally
 6. Check gameplay occupancy:
    * wrong-color available collectible blocks
-   * same-color available collectible can collect if capacity remains
-   * collecting or removed collectible is ignored
-7. Apply accepted collections immediately.
-8. If capacity becomes full, stop traversal and begin hole completion flow.
-9. If the sweep encounters a blocker, stop at the last valid accepted position before the blocker.
+   * same-color available collectible can reserve if unfilled, unreserved capacity remains
+   * reserved, collecting, or removed collectible is ignored for blocking
+7. Apply accepted reservations immediately.
+8. At the authoritative accepted position, trigger reserved collectibles within the configured threshold.
+9. After each triggered placeholder presentation completes, fill capacity.
+10. If fill count reaches capacity, stop dragging and begin hole completion flow.
+11. If the sweep encounters a blocker, stop at the last valid accepted position before the blocker.
 
 ---
 
@@ -445,19 +473,21 @@ Authoritative gameplay must come from deterministic swept footprint and board-ce
 
 ## Animation Rules
 
-When a collectible is accepted:
+When a collectible is reserved and later reaches its trigger threshold:
 
-1. gameplay state changes immediately to `Collecting`
-2. hole fill count updates immediately
-3. animation starts
-4. animation completes
-5. collectible finalizes as `Collected / Removed`
+1. drag-time acceptance changes gameplay state immediately to `Reserved`
+2. the collectible stops blocking and one capacity slot is reserved
+3. reaching the threshold changes state to `Collecting`
+4. presentation starts
+5. presentation completes
+6. the collectible finalizes as `Collected / Removed`
+7. the reserved slot becomes one filled slot
 
 Animation must not decide:
 
 * whether collection is valid
 * whether movement is blocked
-* whether capacity is filled
+* whether a reserved target belongs to the moving hole
 
 DOTween and Animator are presentation tools, not gameplay authority.
 
@@ -644,8 +674,9 @@ The grid does not force step-by-step movement.
 The board is used to validate what the moving footprint overlaps or crosses.
 Same-color collectibles collect during drag.
 Wrong-color collectibles block during drag.
-Accepted collectibles stop blocking immediately.
-Capacity fills immediately.
+Accepted collectibles become reserved and stop blocking immediately.
+Visual collection starts only at the configured trigger threshold.
+Capacity fills when collection presentation completes.
 Full holes close and complete.
 Snap aligns on release only.
 Win happens after all required holes complete their closing or completion sequence.

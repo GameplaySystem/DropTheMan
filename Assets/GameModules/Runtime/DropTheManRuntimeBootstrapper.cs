@@ -70,11 +70,18 @@ namespace DropAwayPrototype.Runtime
             GridWorldLayout worldLayout,
             IEnumerable<IDropTheManHoleView> holeViews,
             IEnumerable<IDropTheManStickmanView> stickmanViews,
-            TimerSystem timerSystem = null)
+            TimerSystem timerSystem = null,
+            float collectionTriggerRadiusInCells = 0.35f)
         {
             if (runtimeModel == null)
             {
                 return DropTheManRuntimeBootstrapResult.Failed("Runtime model is required.");
+            }
+
+            if (collectionTriggerRadiusInCells <= 0f)
+            {
+                return DropTheManRuntimeBootstrapResult.Failed(
+                    "Collection trigger radius must be positive.");
             }
 
             DropTheManViewRegistry viewRegistry = new();
@@ -105,7 +112,8 @@ namespace DropAwayPrototype.Runtime
                 new GameStateSystem(),
                 new DropTheManDragSessionOwner(),
                 new DropTheManOutcomeRouter(),
-                timerSystem);
+                timerSystem,
+                collectionTriggerRadiusInCells);
 
             return DropTheManRuntimeBootstrapResult.Successful(
                 controller,
