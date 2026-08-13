@@ -393,7 +393,8 @@ namespace DropAwayPrototype.Runtime
         /// </summary>
         public DropTheManDragSessionUpdateResult UpdateDrag(
             Vector3 candidateWorldPosition,
-            float collectionTriggerRadiusInCells)
+            float collectionTriggerRadiusInCells,
+            float dragClearanceInsetCells)
         {
             if (!_isSessionActive || _activeHole == null || _runtimeModel == null)
             {
@@ -410,7 +411,8 @@ namespace DropAwayPrototype.Runtime
                         PreviousAcceptedWorldPosition,
                         candidateWorldPosition,
                         _worldLayout,
-                        collectionTriggerRadiusInCells));
+                        collectionTriggerRadiusInCells,
+                        dragClearanceInsetCells));
 
             PreviousAcceptedWorldPosition = coordinatorResult.AuthoritativeWorldPosition;
 

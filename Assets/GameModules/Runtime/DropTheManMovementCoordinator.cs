@@ -22,7 +22,8 @@ namespace DropAwayPrototype.Runtime
             Vector3 previousAcceptedWorldPosition,
             Vector3 candidateWorldPosition,
             GridWorldLayout worldLayout,
-            float collectionTriggerRadiusInCells)
+            float collectionTriggerRadiusInCells,
+            float dragClearanceInsetCells)
         {
             RuntimeModel = runtimeModel;
             Hole = hole;
@@ -30,6 +31,7 @@ namespace DropAwayPrototype.Runtime
             CandidateWorldPosition = candidateWorldPosition;
             WorldLayout = worldLayout;
             CollectionTriggerRadiusInCells = collectionTriggerRadiusInCells;
+            DragClearanceInsetCells = dragClearanceInsetCells;
         }
 
         public DropTheManRuntimeModel RuntimeModel { get; }
@@ -45,6 +47,7 @@ namespace DropAwayPrototype.Runtime
         public Vector3 CandidateWorldPosition { get; }
         public GridWorldLayout WorldLayout { get; }
         public float CollectionTriggerRadiusInCells { get; }
+        public float DragClearanceInsetCells { get; }
     }
 
     /// <summary>
@@ -196,40 +199,41 @@ namespace DropAwayPrototype.Runtime
                     "Collection trigger radius must be positive.");
             }
 
+            if (request.DragClearanceInsetCells < 0f || request.DragClearanceInsetCells > 0.45f)
+            {
+                return DropTheManMovementCoordinatorResult.Failed(
+                    request.PreviousAcceptedWorldPosition,
+                    "Drag clearance inset must stay between 0 and 0.45 cells.");
+            }
+
             List<StickmanRuntimeState> newlyReservedStickmen = new();
             List<StickmanRuntimeState> newlyCollectingStickmen = new();
             HashSet<GridCoordinate> committedHoleFootprint =
                 BuildCommittedHoleFootprint(request.Hole);
+            ShapeAwareDragFootprint dragFootprint =
+                new(request.Hole.Footprint.Offsets, request.DragClearanceInsetCells);
             Vector3 boundedCandidateWorldPosition =
-                ClampCandidateToBoardBounds(request);
+                ClampCandidateToBoardBounds(request, dragFootprint);
+            Vector3 authoritativeWorldPosition =
+                ResolveAuthoritativeWorldPosition(
+                    request,
+                    committedHoleFootprint,
+                    dragFootprint,
+                    boundedCandidateWorldPosition,
+                    out bool wasBlocked,
+                    out string blockingReason);
+
             IReadOnlyList<SweptFootprintContactGroup> contactGroups =
                 _sweptFootprintHelper.EnumerateContactGroups(
                     new SweptFootprintRequest(
                         request.PreviousAcceptedWorldPosition,
-                        boundedCandidateWorldPosition,
+                        authoritativeWorldPosition,
                         request.WorldLayout,
-                        request.Hole.Footprint.Offsets));
-
-            Vector3 authoritativeWorldPosition = request.PreviousAcceptedWorldPosition;
+                        dragFootprint.Rectangles));
 
             for (int groupIndex = 0; groupIndex < contactGroups.Count; groupIndex++)
             {
                 SweptFootprintContactGroup contactGroup = contactGroups[groupIndex];
-                if (TryGetBlockingReason(
-                        request,
-                        committedHoleFootprint,
-                        contactGroup,
-                        out string blockingReason))
-                {
-                    return BuildEvaluatedResult(
-                        request,
-                        authoritativeWorldPosition,
-                        true,
-                        newlyReservedStickmen,
-                        newlyCollectingStickmen,
-                        blockingReason);
-                }
-
                 authoritativeWorldPosition =
                     contactGroup.SampledPosition.ToWorld(request.WorldLayout);
 
@@ -278,11 +282,11 @@ namespace DropAwayPrototype.Runtime
 
             return BuildEvaluatedResult(
                 request,
-                boundedCandidateWorldPosition,
-                false,
+                authoritativeWorldPosition,
+                wasBlocked,
                 newlyReservedStickmen,
                 newlyCollectingStickmen,
-                string.Empty);
+                blockingReason);
         }
 
         private static DropTheManMovementCoordinatorResult BuildEvaluatedResult(
@@ -374,30 +378,76 @@ namespace DropAwayPrototype.Runtime
             return new HashSet<GridCoordinate>(hole.ResolveFootprintCoordinates());
         }
 
-        private static Vector3 ClampCandidateToBoardBounds(
-            DropTheManMovementCoordinatorRequest request)
+        private Vector3 ResolveAuthoritativeWorldPosition(
+            DropTheManMovementCoordinatorRequest request,
+            HashSet<GridCoordinate> committedHoleFootprint,
+            ShapeAwareDragFootprint dragFootprint,
+            Vector3 boundedCandidateWorldPosition,
+            out bool wasBlocked,
+            out string blockingReason)
         {
-            IReadOnlyList<GridCoordinate> offsets = request.Hole.Footprint.Offsets.Count > 0
-                ? request.Hole.Footprint.Offsets
-                : SingleCellOffsets;
-
-            int minOffsetX = offsets[0].X;
-            int minOffsetY = offsets[0].Y;
-            int maxOffsetXExclusive = offsets[0].X + 1;
-            int maxOffsetYExclusive = offsets[0].Y + 1;
-
-            for (int i = 1; i < offsets.Count; i++)
+            if (IsPathClear(
+                    request,
+                    committedHoleFootprint,
+                    dragFootprint,
+                    request.PreviousAcceptedWorldPosition,
+                    boundedCandidateWorldPosition,
+                    out blockingReason))
             {
-                minOffsetX = Mathf.Min(minOffsetX, offsets[i].X);
-                minOffsetY = Mathf.Min(minOffsetY, offsets[i].Y);
-                maxOffsetXExclusive = Mathf.Max(maxOffsetXExclusive, offsets[i].X + 1);
-                maxOffsetYExclusive = Mathf.Max(maxOffsetYExclusive, offsets[i].Y + 1);
+                wasBlocked = false;
+                return boundedCandidateWorldPosition;
             }
 
-            float minX = -minOffsetX;
-            float minY = -minOffsetY;
-            float maxX = request.RuntimeModel.FrameworkContext.GridBoard.Width - maxOffsetXExclusive;
-            float maxY = request.RuntimeModel.FrameworkContext.GridBoard.Height - maxOffsetYExclusive;
+            wasBlocked = true;
+            Vector3 bestWorldPosition = request.PreviousAcceptedWorldPosition;
+            float bestProgressSquared = 0f;
+
+            BoardLocalContinuousPosition previous =
+                BoardLocalContinuousPosition.FromWorld(
+                    request.PreviousAcceptedWorldPosition,
+                    request.WorldLayout);
+            BoardLocalContinuousPosition candidate =
+                BoardLocalContinuousPosition.FromWorld(
+                    boundedCandidateWorldPosition,
+                    request.WorldLayout);
+
+            Vector3 horizontalSlideWorld =
+                CreateWorldPositionFromBoardLocal(
+                    request,
+                    new BoardLocalContinuousPosition(candidate.X, previous.Y),
+                    boundedCandidateWorldPosition);
+            TrySelectBetterSlidingCandidate(
+                request,
+                committedHoleFootprint,
+                dragFootprint,
+                horizontalSlideWorld,
+                ref bestWorldPosition,
+                ref bestProgressSquared);
+
+            Vector3 verticalSlideWorld =
+                CreateWorldPositionFromBoardLocal(
+                    request,
+                    new BoardLocalContinuousPosition(previous.X, candidate.Y),
+                    boundedCandidateWorldPosition);
+            TrySelectBetterSlidingCandidate(
+                request,
+                committedHoleFootprint,
+                dragFootprint,
+                verticalSlideWorld,
+                ref bestWorldPosition,
+                ref bestProgressSquared);
+
+            return bestWorldPosition;
+        }
+
+        private static Vector3 ClampCandidateToBoardBounds(
+            DropTheManMovementCoordinatorRequest request,
+            ShapeAwareDragFootprint dragFootprint)
+        {
+            float minX = -dragFootprint.MinX;
+            float minY = -dragFootprint.MinY;
+            float maxX = request.RuntimeModel.FrameworkContext.GridBoard.Width - dragFootprint.MaxX;
+            float maxY = request.RuntimeModel.FrameworkContext.GridBoard.Height - dragFootprint.MaxY;
 
             if (minX > maxX || minY > maxY)
             {
@@ -417,6 +467,82 @@ namespace DropAwayPrototype.Runtime
             Vector3 clampedBoardPlaneWorld = clampedCandidate.ToWorld(request.WorldLayout);
             Vector3 heightOffset = request.CandidateWorldPosition - candidateBoardPlaneWorld;
             return clampedBoardPlaneWorld + heightOffset;
+        }
+
+        private bool IsPathClear(
+            DropTheManMovementCoordinatorRequest request,
+            HashSet<GridCoordinate> committedHoleFootprint,
+            ShapeAwareDragFootprint dragFootprint,
+            Vector3 fromWorldPosition,
+            Vector3 toWorldPosition,
+            out string blockingReason)
+        {
+            IReadOnlyList<SweptFootprintContactGroup> contactGroups =
+                _sweptFootprintHelper.EnumerateContactGroups(
+                    new SweptFootprintRequest(
+                        fromWorldPosition,
+                        toWorldPosition,
+                        request.WorldLayout,
+                        dragFootprint.Rectangles));
+
+            for (int groupIndex = 0; groupIndex < contactGroups.Count; groupIndex++)
+            {
+                if (TryGetBlockingReason(
+                        request,
+                        committedHoleFootprint,
+                        contactGroups[groupIndex],
+                        out blockingReason))
+                {
+                    return false;
+                }
+            }
+
+            blockingReason = string.Empty;
+            return true;
+        }
+
+        private void TrySelectBetterSlidingCandidate(
+            DropTheManMovementCoordinatorRequest request,
+            HashSet<GridCoordinate> committedHoleFootprint,
+            ShapeAwareDragFootprint dragFootprint,
+            Vector3 candidateWorldPosition,
+            ref Vector3 bestWorldPosition,
+            ref float bestProgressSquared)
+        {
+            if (!IsPathClear(
+                    request,
+                    committedHoleFootprint,
+                    dragFootprint,
+                    request.PreviousAcceptedWorldPosition,
+                    candidateWorldPosition,
+                    out _))
+            {
+                return;
+            }
+
+            float progressSquared =
+                (candidateWorldPosition - request.PreviousAcceptedWorldPosition).sqrMagnitude;
+            if (progressSquared <= bestProgressSquared)
+            {
+                return;
+            }
+
+            bestWorldPosition = candidateWorldPosition;
+            bestProgressSquared = progressSquared;
+        }
+
+        private static Vector3 CreateWorldPositionFromBoardLocal(
+            DropTheManMovementCoordinatorRequest request,
+            BoardLocalContinuousPosition boardLocalPosition,
+            Vector3 referenceWorldPosition)
+        {
+            Vector3 referenceBoardPlaneWorld =
+                BoardLocalContinuousPosition.FromWorld(
+                    referenceWorldPosition,
+                    request.WorldLayout).ToWorld(request.WorldLayout);
+            Vector3 targetBoardPlaneWorld = boardLocalPosition.ToWorld(request.WorldLayout);
+            Vector3 heightOffset = referenceWorldPosition - referenceBoardPlaneWorld;
+            return targetBoardPlaneWorld + heightOffset;
         }
 
         private static bool TryGetBlockingReason(

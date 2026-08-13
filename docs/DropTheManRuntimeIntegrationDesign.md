@@ -72,6 +72,14 @@ This design also assumes no current approved need for:
 * animation-completion-gated gameplay
 * a framework event bus for this prototype slice
 
+Phase 4A addendum:
+
+* JSON-driven gameplay runtime spawning is now an approved prototype-owned follow-up
+* the dev gameplay bootstrapper may clone one hole-view template and one stickman-view
+  template into runtime-spawned scene objects after the runtime model is built
+* spawned views still remain presentation/input adapters only; runtime state stays gameplay
+  authority
+
 ---
 
 ## Architecture Review
@@ -225,6 +233,7 @@ The bootstrapper should create and hold explicit references to:
 * view registry
 * input adapter
 * timer/gameplay loop owner
+* scene-level movement-feel tuning such as collection trigger radius and drag clearance inset
 
 ### Startup Flow
 
@@ -413,6 +422,9 @@ reject if GameStateSystem.CurrentState is not Playing
     ->
 convert pointer to candidate world position
     ->
+optionally clamp candidate travel against the active hole-view position using a configured
+max speed so blocker release cannot produce a large one-frame jump
+    ->
 call DropTheManDragSessionOwner.UpdateDrag(candidateWorldPosition) once
     ->
 apply returned authoritative world position to the active hole view
@@ -427,6 +439,10 @@ if full-hole completion result reports a completed hole, route it to outcome rou
 The adapter must not call `DropTheManMovementCoordinator` directly.
 
 The adapter must not call `UpdateDrag(...)` twice for one pointer sample.
+
+The runtime controller may also pass a scene-configured shape-aware drag clearance inset into the
+movement coordinator so only the actively dragged hole receives narrow-corridor tolerance. Exact
+release, snap, occupancy, and content footprint truth remain unchanged.
 
 ### Pointer Up / Cancel
 
@@ -466,6 +482,7 @@ Because drag updates mutate gameplay state, the adapter should keep a simple gua
 * active pointer id
 * last processed frame or input sequence id
 * one active drag session flag
+* optional per-frame candidate-distance clamp for drag feel only
 
 The guard exists only to prevent duplicate calls into `DropTheManDragSessionOwner.UpdateDrag(...)`.
 
@@ -685,7 +702,9 @@ Do not include in that slice:
 These questions do not block the design, but they should be answered before editing scenes or prefabs:
 
 * Which MVP level source should the bootstrapper use first: serialized scene reference, test asset, loaded JSON, or an existing prototype content loader?
-* Are hole and stickman views pre-placed in the scene and registered by id, or spawned from runtime definitions?
+* Runtime spawning now uses scene-local template views in the gameplay test scene; revisit
+  whether that should become dedicated prefab assets before broader level-selection or
+  gameplay-bridge work.
 * Which board plane and camera should convert pointer screen positions into drag world positions?
 * Should timer start immediately on `Playing`, or after the first successful input?
 * What should the scene do visually when a stickman is `Collecting` but no animation system exists yet?

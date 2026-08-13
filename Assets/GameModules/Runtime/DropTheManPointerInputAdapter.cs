@@ -19,12 +19,14 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Transform boardPlaneOrigin;
         [SerializeField] private Vector3 boardPlaneNormal = Vector3.up;
         [SerializeField] private Vector3 dragWorldOffset;
+        [SerializeField, Min(0f)] private float maxDragSpeedUnitsPerSecond = 12f;
         [SerializeField] private bool enableMouseInput = true;
 
         private bool _isDragging;
         private int _activePointerId = -1;
         private int _lastProcessedDragFrame = -1;
         private Vector3 _activeHoleToPointerWorldOffset;
+        private DropTheManHoleView _activeHoleView;
 
         public bool IsDragging => _isDragging;
 
@@ -95,6 +97,7 @@ namespace DropAwayPrototype.Runtime
             }
 
             _activeHoleToPointerWorldOffset = holeView.WorldPosition - pointerWorldPosition;
+            _activeHoleView = holeView;
             _isDragging = true;
             _activePointerId = pointerId;
             _lastProcessedDragFrame = -1;
@@ -118,9 +121,19 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            Vector3 targetWorldPosition = worldPosition + _activeHoleToPointerWorldOffset;
+            if (_activeHoleView != null && maxDragSpeedUnitsPerSecond > 0f)
+            {
+                float maxDistance =
+                    maxDragSpeedUnitsPerSecond * Mathf.Max(Time.deltaTime, 1f / 240f);
+                targetWorldPosition = Vector3.MoveTowards(
+                    _activeHoleView.WorldPosition,
+                    targetWorldPosition,
+                    maxDistance);
+            }
+
             _lastProcessedDragFrame = Time.frameCount;
-            bool updated =
-                sceneController.TryUpdateDrag(worldPosition + _activeHoleToPointerWorldOffset);
+            bool updated = sceneController.TryUpdateDrag(targetWorldPosition);
             if (!updated || !sceneController.InputEnabled)
             {
                 ClearLocalPointerState();
@@ -161,6 +174,7 @@ namespace DropAwayPrototype.Runtime
             _activePointerId = -1;
             _lastProcessedDragFrame = -1;
             _activeHoleToPointerWorldOffset = default;
+            _activeHoleView = null;
         }
 
         private bool CanAcceptPointer(int pointerId, bool requireActiveDrag)

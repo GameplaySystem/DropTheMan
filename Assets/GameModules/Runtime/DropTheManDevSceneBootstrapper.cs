@@ -3,6 +3,7 @@ using PuzzleFramework.CoreBoard;
 using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace DropAwayPrototype.Runtime
 {
@@ -22,6 +23,8 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Vector2 cellSize = Vector2.one;
         [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
         [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
+        [SerializeField] private bool spawnRuntimeViews = true;
+        [SerializeField] private Transform runtimeViewSpawnRoot;
         [SerializeField] private DropTheManDevLevelData levelData =
             DropTheManDevLevelData.CreateDefault();
 
@@ -121,13 +124,13 @@ namespace DropAwayPrototype.Runtime
             }
 
             DropTheManRuntimeControllerResult sceneInitializeResult =
-                sceneController.Initialize(
+                InitializeSceneController(
                     modelBuildResult.RuntimeModel,
                     worldLayout,
-                    timerSystem);
+                    timerSystem,
+                    out failureReason);
             if (!sceneInitializeResult.Success)
             {
-                failureReason = sceneInitializeResult.FailureReason;
                 return false;
             }
 
@@ -157,6 +160,104 @@ namespace DropAwayPrototype.Runtime
                 levelData,
                 out jsonText,
                 out failureReason);
+        }
+
+        private DropTheManRuntimeControllerResult InitializeSceneController(
+            DropTheManRuntimeModel runtimeModel,
+            GridWorldLayout worldLayout,
+            TimerSystem timerSystem,
+            out string failureReason)
+        {
+            if (spawnRuntimeViews)
+            {
+                if (!TrySpawnRuntimeViews(
+                        runtimeModel,
+                        worldLayout,
+                        out DropTheManHoleView[] runtimeHoleViews,
+                        out DropTheManStickmanView[] runtimeStickmanViews,
+                        out failureReason))
+                {
+                    return DropTheManRuntimeControllerResult.Failed(failureReason);
+                }
+
+                sceneController.SetRuntimeViews(runtimeHoleViews, runtimeStickmanViews);
+            }
+            else
+            {
+                sceneController.SetRuntimeViews(
+                    new List<DropTheManHoleView>(sceneController.HoleViewTemplates).ToArray(),
+                    new List<DropTheManStickmanView>(sceneController.StickmanViewTemplates).ToArray());
+            }
+
+            DropTheManRuntimeControllerResult initializeResult =
+                sceneController.Initialize(
+                    runtimeModel,
+                    worldLayout,
+                    timerSystem);
+            failureReason = initializeResult.FailureReason;
+            return initializeResult;
+        }
+
+        private bool TrySpawnRuntimeViews(
+            DropTheManRuntimeModel runtimeModel,
+            GridWorldLayout worldLayout,
+            out DropTheManHoleView[] runtimeHoleViews,
+            out DropTheManStickmanView[] runtimeStickmanViews,
+            out string failureReason)
+        {
+            DropTheManHoleView holeTemplate = ResolveFirstTemplate(sceneController.HoleViewTemplates);
+            if (holeTemplate == null)
+            {
+                runtimeHoleViews = null;
+                runtimeStickmanViews = null;
+                failureReason =
+                    "Runtime spawning requires at least one hole view template on the scene controller.";
+                return false;
+            }
+
+            DropTheManStickmanView stickmanTemplate =
+                ResolveFirstTemplate(sceneController.StickmanViewTemplates);
+            if (stickmanTemplate == null)
+            {
+                runtimeHoleViews = null;
+                runtimeStickmanViews = null;
+                failureReason =
+                    "Runtime spawning requires at least one stickman view template on the scene controller.";
+                return false;
+            }
+
+            Transform spawnRoot = runtimeViewSpawnRoot != null
+                ? runtimeViewSpawnRoot
+                : transform;
+
+            return new DropTheManRuntimeLevelViewSpawner().TrySpawnViews(
+                runtimeModel,
+                worldLayout,
+                holeTemplate,
+                stickmanTemplate,
+                spawnRoot,
+                out runtimeHoleViews,
+                out runtimeStickmanViews,
+                out failureReason);
+        }
+
+        private static T ResolveFirstTemplate<T>(IReadOnlyList<T> templates)
+            where T : UnityEngine.Object
+        {
+            if (templates == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < templates.Count; i++)
+            {
+                if (templates[i] != null)
+                {
+                    return templates[i];
+                }
+            }
+
+            return null;
         }
 
         private IDropTheManLevelDefinitionProvider CreateLevelDefinitionProvider()
@@ -208,6 +309,135 @@ namespace DropAwayPrototype.Runtime
         {
             InspectorDevData = 0,
             JsonTextAsset = 1
+        }
+    }
+
+    internal sealed class DropTheManRuntimeLevelViewSpawner
+    {
+        public bool TrySpawnViews(
+            DropTheManRuntimeModel runtimeModel,
+            GridWorldLayout worldLayout,
+            DropTheManHoleView holeTemplate,
+            DropTheManStickmanView stickmanTemplate,
+            Transform spawnRoot,
+            out DropTheManHoleView[] spawnedHoleViews,
+            out DropTheManStickmanView[] spawnedStickmanViews,
+            out string failureReason)
+        {
+            spawnedHoleViews = null;
+            spawnedStickmanViews = null;
+
+            if (runtimeModel == null)
+            {
+                failureReason = "Runtime model is required for view spawning.";
+                return false;
+            }
+
+            if (holeTemplate == null)
+            {
+                failureReason = "A hole view template is required for runtime spawning.";
+                return false;
+            }
+
+            if (stickmanTemplate == null)
+            {
+                failureReason = "A stickman view template is required for runtime spawning.";
+                return false;
+            }
+
+            Transform resolvedRoot = EnsureSpawnRoot(spawnRoot);
+            DestroyChildren(resolvedRoot);
+
+            Transform holesRoot = EnsureChildRoot(resolvedRoot, "SpawnedHoleViews");
+            Transform stickmenRoot = EnsureChildRoot(resolvedRoot, "SpawnedStickmanViews");
+
+            holeTemplate.SetTemplateHidden(true);
+            stickmanTemplate.SetTemplateHidden(true);
+
+            spawnedHoleViews = new DropTheManHoleView[runtimeModel.Holes.Count];
+            for (int i = 0; i < runtimeModel.Holes.Count; i++)
+            {
+                HoleRuntimeState hole = runtimeModel.Holes[i];
+                Vector3 worldPosition = ToWorldPosition(
+                    worldLayout,
+                    hole.CurrentCoordinate,
+                    holeTemplate.transform.position.y);
+
+                DropTheManHoleView holeView = Object.Instantiate(holeTemplate, holesRoot);
+                holeView.name = $"Hole_{hole.Id}";
+                holeView.ConfigureSpawnedView(hole.Id, worldPosition, hole.ColorIdentity);
+                spawnedHoleViews[i] = holeView;
+            }
+
+            spawnedStickmanViews = new DropTheManStickmanView[runtimeModel.Stickmen.Count];
+            for (int i = 0; i < runtimeModel.Stickmen.Count; i++)
+            {
+                StickmanRuntimeState stickman = runtimeModel.Stickmen[i];
+                Vector3 worldPosition = ToWorldPosition(
+                    worldLayout,
+                    stickman.Coordinate,
+                    stickmanTemplate.transform.position.y);
+
+                DropTheManStickmanView stickmanView =
+                    Object.Instantiate(stickmanTemplate, stickmenRoot);
+                stickmanView.name = $"Stickman_{stickman.Id}";
+                stickmanView.ConfigureSpawnedView(
+                    stickman.Id,
+                    worldPosition,
+                    stickman.ColorIdentity);
+                spawnedStickmanViews[i] = stickmanView;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static Vector3 ToWorldPosition(
+            GridWorldLayout worldLayout,
+            GridCoordinate coordinate,
+            float visualHeight)
+        {
+            Vector3 worldPosition =
+                worldLayout.BoardLocalToWorld(new Vector2(coordinate.X, coordinate.Y));
+            worldPosition.y = visualHeight;
+            return worldPosition;
+        }
+
+        private static Transform EnsureSpawnRoot(Transform spawnRoot)
+        {
+            if (spawnRoot != null)
+            {
+                return spawnRoot;
+            }
+
+            GameObject rootObject = GameObject.Find("DropTheManSpawnedViews");
+            if (rootObject == null)
+            {
+                rootObject = new GameObject("DropTheManSpawnedViews");
+            }
+
+            return rootObject.transform;
+        }
+
+        private static Transform EnsureChildRoot(Transform parent, string name)
+        {
+            Transform existing = parent.Find(name);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            GameObject rootObject = new(name);
+            rootObject.transform.SetParent(parent, false);
+            return rootObject.transform;
+        }
+
+        private static void DestroyChildren(Transform root)
+        {
+            for (int i = root.childCount - 1; i >= 0; i--)
+            {
+                Object.Destroy(root.GetChild(i).gameObject);
+            }
         }
     }
 }

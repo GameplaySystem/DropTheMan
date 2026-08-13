@@ -13,12 +13,27 @@ namespace DropAwayPrototype.Runtime
     internal readonly struct FootprintCellRectangle
     {
         public FootprintCellRectangle(GridCoordinate offset)
+            : this(
+                offset,
+                offset.X,
+                offset.Y,
+                offset.X + 1f,
+                offset.Y + 1f)
+        {
+        }
+
+        public FootprintCellRectangle(
+            GridCoordinate offset,
+            float minX,
+            float minY,
+            float maxX,
+            float maxY)
         {
             Offset = offset;
-            MinX = offset.X;
-            MinY = offset.Y;
-            MaxX = offset.X + 1f;
-            MaxY = offset.Y + 1f;
+            MinX = minX;
+            MinY = minY;
+            MaxX = maxX;
+            MaxY = maxY;
         }
 
         public GridCoordinate Offset { get; }
@@ -94,17 +109,97 @@ namespace DropAwayPrototype.Runtime
             Vector3 previousAcceptedWorldPosition,
             Vector3 candidateWorldPosition,
             GridWorldLayout worldLayout,
-            IReadOnlyList<GridCoordinate> footprintOffsets)
+            IReadOnlyList<FootprintCellRectangle> footprintRectangles)
         {
             PreviousAcceptedWorldPosition = previousAcceptedWorldPosition;
             CandidateWorldPosition = candidateWorldPosition;
             WorldLayout = worldLayout;
-            FootprintOffsets = footprintOffsets ?? Array.Empty<GridCoordinate>();
+            FootprintRectangles = footprintRectangles ?? Array.Empty<FootprintCellRectangle>();
         }
 
         public Vector3 PreviousAcceptedWorldPosition { get; }
         public Vector3 CandidateWorldPosition { get; }
         public GridWorldLayout WorldLayout { get; }
-        public IReadOnlyList<GridCoordinate> FootprintOffsets { get; }
+        public IReadOnlyList<FootprintCellRectangle> FootprintRectangles { get; }
+    }
+
+    /// <summary>
+    /// Pure geometry helper for the actively dragged hole's shape-aware query footprint.
+    /// It preserves the authored footprint cell topology while insetting only exposed outer
+    /// edges so narrow-corridor drag feel can be tuned without changing committed gameplay
+    /// footprint truth.
+    /// </summary>
+    internal sealed class ShapeAwareDragFootprint
+    {
+        private static readonly GridCoordinate[] SingleCellOffsets =
+        {
+            new(0, 0)
+        };
+
+        public ShapeAwareDragFootprint(
+            IReadOnlyList<GridCoordinate> footprintOffsets,
+            float dragClearanceInsetCells)
+        {
+            float inset = Mathf.Clamp(dragClearanceInsetCells, 0f, 0.45f);
+            IReadOnlyList<GridCoordinate> offsets =
+                footprintOffsets != null && footprintOffsets.Count > 0
+                    ? footprintOffsets
+                    : SingleCellOffsets;
+
+            HashSet<GridCoordinate> offsetSet = new(offsets);
+            List<FootprintCellRectangle> rectangles = new(offsets.Count);
+
+            float minX = float.PositiveInfinity;
+            float minY = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float maxY = float.NegativeInfinity;
+
+            for (int i = 0; i < offsets.Count; i++)
+            {
+                GridCoordinate offset = offsets[i];
+
+                float rectMinX = offset.X +
+                                 (offsetSet.Contains(new GridCoordinate(offset.X - 1, offset.Y))
+                                     ? 0f
+                                     : inset);
+                float rectMaxX = offset.X + 1f -
+                                 (offsetSet.Contains(new GridCoordinate(offset.X + 1, offset.Y))
+                                     ? 0f
+                                     : inset);
+                float rectMinY = offset.Y +
+                                 (offsetSet.Contains(new GridCoordinate(offset.X, offset.Y - 1))
+                                     ? 0f
+                                     : inset);
+                float rectMaxY = offset.Y + 1f -
+                                 (offsetSet.Contains(new GridCoordinate(offset.X, offset.Y + 1))
+                                     ? 0f
+                                     : inset);
+
+                FootprintCellRectangle rectangle = new(
+                    offset,
+                    rectMinX,
+                    rectMinY,
+                    rectMaxX,
+                    rectMaxY);
+                rectangles.Add(rectangle);
+
+                minX = Mathf.Min(minX, rectMinX);
+                minY = Mathf.Min(minY, rectMinY);
+                maxX = Mathf.Max(maxX, rectMaxX);
+                maxY = Mathf.Max(maxY, rectMaxY);
+            }
+
+            Rectangles = new ReadOnlyCollection<FootprintCellRectangle>(rectangles);
+            MinX = minX;
+            MinY = minY;
+            MaxX = maxX;
+            MaxY = maxY;
+        }
+
+        public IReadOnlyList<FootprintCellRectangle> Rectangles { get; }
+        public float MinX { get; }
+        public float MinY { get; }
+        public float MaxX { get; }
+        public float MaxY { get; }
     }
 }

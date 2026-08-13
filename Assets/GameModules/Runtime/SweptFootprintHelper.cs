@@ -17,11 +17,6 @@ namespace DropAwayPrototype.Runtime
         private const float EventEpsilon = 0.0001f;
         private const float EqualityEpsilon = 0.00001f;
 
-        private static readonly GridCoordinate[] SingleCellOffsets =
-        {
-            new(0, 0)
-        };
-
         /// <summary>
         /// Enumerates ordered contact groups between the previous accepted position and the
         /// current candidate position without relying on final-position-only sampling.
@@ -29,10 +24,6 @@ namespace DropAwayPrototype.Runtime
         public IReadOnlyList<SweptFootprintContactGroup> EnumerateContactGroups(
             SweptFootprintRequest request)
         {
-            IReadOnlyList<GridCoordinate> offsets = request.FootprintOffsets.Count > 0
-                ? request.FootprintOffsets
-                : SingleCellOffsets;
-
             BoardLocalContinuousPosition previousAccepted =
                 BoardLocalContinuousPosition.FromWorld(
                     request.PreviousAcceptedWorldPosition,
@@ -42,7 +33,7 @@ namespace DropAwayPrototype.Runtime
                     request.CandidateWorldPosition,
                     request.WorldLayout);
 
-            List<FootprintCellRectangle> footprint = BuildFootprint(offsets);
+            IReadOnlyList<FootprintCellRectangle> footprint = request.FootprintRectangles;
             List<float> eventTimes = BuildEventTimes(previousAccepted, candidate, footprint);
             float sweepDistance = previousAccepted.DistanceTo(candidate);
             HashSet<GridCoordinate> acceptedOverlap = ResolveOverlap(previousAccepted, footprint);
@@ -87,19 +78,6 @@ namespace DropAwayPrototype.Runtime
             }
 
             return groups;
-        }
-
-        private static List<FootprintCellRectangle> BuildFootprint(
-            IReadOnlyList<GridCoordinate> offsets)
-        {
-            List<FootprintCellRectangle> footprint = new(offsets.Count);
-
-            for (int i = 0; i < offsets.Count; i++)
-            {
-                footprint.Add(new FootprintCellRectangle(offsets[i]));
-            }
-
-            return footprint;
         }
 
         private static List<float> BuildEventTimes(

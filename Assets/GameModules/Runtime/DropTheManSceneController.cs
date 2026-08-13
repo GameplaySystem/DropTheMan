@@ -1,6 +1,8 @@
 using PuzzleFramework.CoreBoard;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
+using System;
+using System.Collections.Generic;
 
 namespace DropAwayPrototype.Runtime
 {
@@ -18,13 +20,20 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private bool startGameplayOnInitialize = true;
         [SerializeField] private bool tickTimerInUpdate = true;
         [SerializeField, Min(0.01f)] private float collectionTriggerRadiusInCells = 0.35f;
+        [SerializeField, Range(0f, 0.45f)] private float dragClearanceInsetCells = 0.08f;
 
         private DropTheManRuntimeController _runtimeController;
+        private DropTheManHoleView[] _runtimeHoleViews;
+        private DropTheManStickmanView[] _runtimeStickmanViews;
         private bool _isInitialized;
         private bool _inputEnabled;
 
         public DropTheManRuntimeController RuntimeController => _runtimeController;
         public bool IsInitialized => _isInitialized;
+        public IReadOnlyList<DropTheManHoleView> HoleViewTemplates =>
+            holeViews ?? Array.Empty<DropTheManHoleView>();
+        public IReadOnlyList<DropTheManStickmanView> StickmanViewTemplates =>
+            stickmanViews ?? Array.Empty<DropTheManStickmanView>();
         public bool InputEnabled =>
             _isInitialized &&
             _inputEnabled &&
@@ -33,6 +42,9 @@ namespace DropAwayPrototype.Runtime
 
         private void Awake()
         {
+            _runtimeHoleViews = holeViews ?? Array.Empty<DropTheManHoleView>();
+            _runtimeStickmanViews = stickmanViews ?? Array.Empty<DropTheManStickmanView>();
+
             if (pointerInputAdapter == null)
             {
                 TryGetComponent(out pointerInputAdapter);
@@ -42,6 +54,14 @@ namespace DropAwayPrototype.Runtime
             {
                 pointerInputAdapter.Bind(this);
             }
+        }
+
+        public void SetRuntimeViews(
+            DropTheManHoleView[] runtimeHoleViews,
+            DropTheManStickmanView[] runtimeStickmanViews)
+        {
+            _runtimeHoleViews = runtimeHoleViews ?? Array.Empty<DropTheManHoleView>();
+            _runtimeStickmanViews = runtimeStickmanViews ?? Array.Empty<DropTheManStickmanView>();
         }
 
         private void Update()
@@ -72,10 +92,11 @@ namespace DropAwayPrototype.Runtime
                 new DropTheManRuntimeBootstrapper().CreateController(
                     runtimeModel,
                     worldLayout,
-                    holeViews,
-                    stickmanViews,
+                    _runtimeHoleViews,
+                    _runtimeStickmanViews,
                     timerSystem,
-                    collectionTriggerRadiusInCells);
+                    collectionTriggerRadiusInCells,
+                    dragClearanceInsetCells);
 
             if (!bootstrapResult.Success)
             {

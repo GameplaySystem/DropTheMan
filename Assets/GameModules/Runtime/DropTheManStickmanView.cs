@@ -1,4 +1,5 @@
 using UnityEngine;
+using PuzzleFramework.Presentation;
 
 namespace DropAwayPrototype.Runtime
 {
@@ -13,10 +14,13 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private string runtimeId = string.Empty;
         [SerializeField] private bool hideRenderersOnCollectionStarted = true;
         [SerializeField] private bool disableCollidersOnCollectionStarted = true;
+        [SerializeField] private bool destroySpawnedViewOnCollectionStarted = true;
         [SerializeField] private Renderer[] renderersToHide;
         [SerializeField] private Collider[] collidersToDisable;
 
         private bool _collectionStarted;
+        private bool _templateHidden;
+        private bool _isSpawnedClone;
 
         public string RuntimeId => runtimeId;
         public bool CollectionStarted => _collectionStarted;
@@ -43,6 +47,12 @@ namespace DropAwayPrototype.Runtime
 
             _collectionStarted = true;
 
+            if (_isSpawnedClone && destroySpawnedViewOnCollectionStarted)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             if (disableCollidersOnCollectionStarted && collidersToDisable != null)
             {
                 for (int i = 0; i < collidersToDisable.Length; i++)
@@ -64,6 +74,88 @@ namespace DropAwayPrototype.Runtime
                 if (renderersToHide[i] != null)
                 {
                     renderersToHide[i].enabled = false;
+                }
+            }
+        }
+
+        public void ConfigureSpawnedView(
+            string newRuntimeId,
+            Vector3 worldPosition,
+            ColorIdentity colorIdentity)
+        {
+            runtimeId = newRuntimeId;
+            transform.position = worldPosition;
+            _collectionStarted = false;
+            _templateHidden = false;
+            _isSpawnedClone = true;
+            EnsurePresentationTargets();
+
+            if (collidersToDisable != null)
+            {
+                for (int i = 0; i < collidersToDisable.Length; i++)
+                {
+                    if (collidersToDisable[i] != null)
+                    {
+                        collidersToDisable[i].enabled = true;
+                    }
+                }
+            }
+
+            if (renderersToHide != null)
+            {
+                for (int i = 0; i < renderersToHide.Length; i++)
+                {
+                    if (renderersToHide[i] != null)
+                    {
+                        renderersToHide[i].enabled = true;
+                    }
+                }
+            }
+
+            DropTheManViewPresentationUtility.ApplyColor(renderersToHide, colorIdentity);
+            ApplyTemplateHiddenState();
+        }
+
+        public void SetTemplateHidden(bool isHidden)
+        {
+            _templateHidden = isHidden;
+            ApplyTemplateHiddenState();
+        }
+
+        private void EnsurePresentationTargets()
+        {
+            if (renderersToHide == null || renderersToHide.Length == 0)
+            {
+                renderersToHide = GetComponentsInChildren<Renderer>(includeInactive: true);
+            }
+
+            if (collidersToDisable == null || collidersToDisable.Length == 0)
+            {
+                collidersToDisable = GetComponentsInChildren<Collider>(includeInactive: true);
+            }
+        }
+
+        private void ApplyTemplateHiddenState()
+        {
+            if (collidersToDisable != null)
+            {
+                for (int i = 0; i < collidersToDisable.Length; i++)
+                {
+                    if (collidersToDisable[i] != null)
+                    {
+                        collidersToDisable[i].enabled = !_templateHidden && !_collectionStarted;
+                    }
+                }
+            }
+
+            if (renderersToHide != null)
+            {
+                for (int i = 0; i < renderersToHide.Length; i++)
+                {
+                    if (renderersToHide[i] != null)
+                    {
+                        renderersToHide[i].enabled = !_templateHidden && !_collectionStarted;
+                    }
                 }
             }
         }

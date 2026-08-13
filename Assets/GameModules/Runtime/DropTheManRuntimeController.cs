@@ -213,6 +213,7 @@ namespace DropAwayPrototype.Runtime
         private readonly GameStateSystem _gameStateSystem;
         private readonly TimerSystem _timerSystem;
         private readonly float _collectionTriggerRadiusInCells;
+        private readonly float _dragClearanceInsetCells;
 
         private string _activeHoleId = string.Empty;
         private bool _terminalOutcomeAccepted;
@@ -225,13 +226,21 @@ namespace DropAwayPrototype.Runtime
             DropTheManDragSessionOwner dragSessionOwner = null,
             DropTheManOutcomeRouter outcomeRouter = null,
             TimerSystem timerSystem = null,
-            float collectionTriggerRadiusInCells = 0.35f)
+            float collectionTriggerRadiusInCells = 0.35f,
+            float dragClearanceInsetCells = 0.08f)
         {
             if (collectionTriggerRadiusInCells <= 0f)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(collectionTriggerRadiusInCells),
                     "Collection trigger radius must be positive.");
+            }
+
+            if (dragClearanceInsetCells < 0f || dragClearanceInsetCells > 0.45f)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(dragClearanceInsetCells),
+                    "Drag clearance inset must stay between 0 and 0.45 cells.");
             }
 
             _runtimeModel = runtimeModel ?? throw new ArgumentNullException(nameof(runtimeModel));
@@ -242,6 +251,7 @@ namespace DropAwayPrototype.Runtime
             _outcomeRouter = outcomeRouter ?? new DropTheManOutcomeRouter();
             _timerSystem = timerSystem;
             _collectionTriggerRadiusInCells = collectionTriggerRadiusInCells;
+            _dragClearanceInsetCells = dragClearanceInsetCells;
         }
 
         public bool HasActiveDrag => _dragSessionOwner.HasSessionContext;
@@ -357,7 +367,8 @@ namespace DropAwayPrototype.Runtime
             DropTheManDragSessionUpdateResult updateResult =
                 _dragSessionOwner.UpdateDrag(
                     candidateWorldPosition,
-                    _collectionTriggerRadiusInCells);
+                    _collectionTriggerRadiusInCells,
+                    _dragClearanceInsetCells);
 
             DropTheManViewRegistryResult applyResult =
                 _viewRegistry.ApplyHoleWorldPosition(

@@ -11,6 +11,7 @@ It sits on top of the already implemented runtime integration foundation:
 * `DropTheManViewRegistry`
 * `IDropTheManHoleView`
 * `IDropTheManStickmanView`
+* the Phase 4A dev-scene runtime view spawning path
 
 This is design only.
 
@@ -22,7 +23,7 @@ It does not add:
 
 * animation
 * visual feedback framework behavior
-* prefab spawning
+* a generalized prefab pipeline
 * event bus behavior
 * level-loading UX
 * framework changes
@@ -45,6 +46,13 @@ The prototype now has runtime gameplay orchestration, but no Unity scene layer t
 
 The next implementation must make the prototype playable without letting scene objects become gameplay authority.
 
+Phase 4A resolution:
+
+* gameplay scene objects no longer need authored runtime ids for every hole and stickman
+* the dev gameplay bootstrapper may clone one hole template and one stickman template into
+  runtime-spawned views after JSON or dev-data loading succeeds
+* the spawned views then register through the existing scene-controller/runtime-controller path
+
 ---
 
 ## Assumptions
@@ -52,8 +60,9 @@ The next implementation must make the prototype playable without letting scene o
 This design assumes:
 
 * runtime model construction already happened before scene adapter play begins
-* scene objects are pre-placed for this slice
-* runtime ids on scene views match the ids in `HoleRuntimeState.Id` and `StickmanRuntimeState.Id`
+* one or more scene-local template views exist for cloning
+* spawned runtime hole and stickman views receive ids from `HoleRuntimeState.Id` and
+  `StickmanRuntimeState.Id`
 * the scene adapter receives or creates a `DropTheManRuntimeController` through the existing prototype bootstrapper path
 * pointer screen-to-world conversion can be simple and explicit for the MVP
 * timer behavior remains countdown-only
@@ -61,11 +70,15 @@ This design assumes:
 
 This design rejects:
 
-* prefab spawning for this slice
 * camera conversion hidden inside runtime gameplay services
 * view components calling movement, completion, or outcome services directly
 * scene objects deciding win/loss
 * a temporary event bus
+
+This design still defers:
+
+* a polished reusable prefab-asset pipeline
+* editor-to-gameplay test bridging
 
 ---
 
@@ -75,8 +88,8 @@ This design rejects:
 
 The scene adapter layer owns:
 
-* pre-placed MonoBehaviour view adapters
-* serialized runtime id fields on those adapters
+* serialized template MonoBehaviour view adapters used for runtime spawning
+* runtime-spawned hole and stickman view registration
 * pointer hit-testing against selectable hole views
 * pointer screen-to-world conversion
 * active pointer/sample gating
@@ -121,11 +134,14 @@ IDropTheManHoleView
 
 Responsibilities:
 
-* expose serialized `runtimeId`
+* expose runtime id for registration
 * expose current `transform.position` as `WorldPosition`
 * apply authoritative positions via `ApplyWorldPosition(...)`
 * enable or disable selection through `SetSelectable(...)`
 * expose or own a collider/hit target for pointer selection
+* accept spawned runtime initialization for id, position, and color
+* optionally apply a spawned-view-only visual scale multiplier so runtime holes can read as
+  slightly smaller than their occupied board cells without changing authored footprint truth
 
 Non-responsibilities:
 
@@ -147,9 +163,10 @@ IDropTheManStickmanView
 
 Responsibilities:
 
-* expose serialized `runtimeId`
+* expose runtime id for registration
 * receive `OnCollectionStarted(StickmanRuntimeState stickman)`
 * perform a minimal placeholder reaction
+* accept spawned runtime initialization for id, position, and color
 
 Allowed placeholder reactions:
 
@@ -171,9 +188,10 @@ MonoBehaviour scene composition adapter.
 
 Responsibilities:
 
-* hold serialized references to pre-placed `DropTheManHoleView` objects
-* hold serialized references to pre-placed `DropTheManStickmanView` objects
+* hold serialized references to hole and stickman template views
+* allow the bootstrapper to replace the runtime-registered view arrays with spawned clones
 * provide or receive the already-built runtime model path for MVP
+* own scene-level movement-feel tuning such as collection trigger radius and `dragClearanceInsetCells`
 * call `DropTheManRuntimeBootstrapper.CreateController(...)`
 * call `DropTheManRuntimeController.StartGameplay()`
 * own scene-level enabled/disabled input state
@@ -181,7 +199,6 @@ Responsibilities:
 
 Non-responsibilities:
 
-* do not spawn prefabs
 * do not implement level browser UX
 * do not run save/load
 * do not decide game outcomes
@@ -196,6 +213,7 @@ Responsibilities:
 * detect pointer down, move, release, and cancel
 * hit-test holes on pointer down
 * convert pointer screen positions to board/world positions
+* optionally clamp per-frame candidate travel for smoother drag feel before calling runtime code
 * call the runtime controller exactly once per accepted input sample
 * suppress input after terminal acceptance
 
@@ -210,27 +228,21 @@ The scene controller may own this directly for MVP if keeping it separate adds u
 
 ---
 
-## Runtime Id Authoring
+## Runtime Id Assignment
 
-Runtime ids should be authored explicitly on pre-placed scene objects:
-
-```text
-DropTheManHoleView.runtimeId
-DropTheManStickmanView.runtimeId
-```
-
-These values must match:
+For the Phase 4A spawning path, runtime ids are assigned to spawned views from the runtime model:
 
 ```text
-HoleRuntimeState.Id
-StickmanRuntimeState.Id
+HoleRuntimeState.Id -> spawned DropTheManHoleView.runtimeId
+StickmanRuntimeState.Id -> spawned DropTheManStickmanView.runtimeId
 ```
 
-from the runtime model built from level content.
+The scene-local template views do not need to keep content-specific ids after this slice.
 
 ### Validation Policy
 
-At startup, the scene adapter should register all configured views with `DropTheManRuntimeBootstrapper` / `DropTheManViewRegistry`.
+At startup, the scene adapter should register all spawned runtime views with
+`DropTheManRuntimeBootstrapper` / `DropTheManViewRegistry`.
 
 The registry already rejects:
 
@@ -247,14 +259,13 @@ Do not silently auto-generate ids in the scene adapter.
 
 Reason:
 
-* auto-generation would hide mismatches between authored scene views and runtime level content
-* the first playable slice needs debuggable explicit mapping more than convenience
+* runtime ids must still come from authored content
+* the first spawning slice still needs debuggable explicit mapping more than convenience
 
 ### Future Alternatives
 
-Prefab spawning or runtime-generated views may assign ids from runtime model data later.
-
-That is deliberately deferred.
+Dedicated prefab assets or richer runtime-generated view pipelines may replace the current
+scene-template cloning path later.
 
 ---
 
@@ -441,6 +452,9 @@ if sample was already processed:
 
 convert screen position to world position
     ->
+optionally clamp candidate travel against the current authoritative hole-view position using a
+configured max speed
+    ->
 call controller.UpdateDragWorldPosition(worldPosition) exactly once
     ->
 if terminal accepted, disable input and clear local drag state
@@ -451,6 +465,10 @@ if controller reports no active drag / stop, clear local drag state
 The hole view position is updated inside the runtime controller through the view registry.
 
 The adapter must not apply the raw candidate world position to the hole view.
+
+The runtime drag path may also apply the scene-configured `dragClearanceInsetCells` value so the
+actively dragged hole uses a shape-aware inset query footprint during drag validation only. Exact
+authored footprint truth still owns release, snap, and committed occupancy.
 
 ### Pointer Up
 
@@ -547,13 +565,15 @@ The scene adapter should not duplicate outcome guarding; it should only stop fee
 Recommended MVP scene startup:
 
 ```text
-scene has pre-placed hole/stickman views with authored runtime ids
+scene has one hole template view and one stickman template view
     ->
-scene controller receives or obtains dev-only level/runtime model input
+scene controller / dev bootstrapper receives dev-only level input or JSON TextAsset
     ->
-runtime model is built before scene view registration failure can mutate scene objects
+runtime model is built
     ->
-scene controller passes view arrays to DropTheManRuntimeBootstrapper.CreateController(...)
+dev bootstrapper clones spawned hole/stickman views from templates and assigns ids/colors/positions
+    ->
+scene controller passes spawned view arrays to DropTheManRuntimeBootstrapper.CreateController(...)
     ->
 if bootstrap succeeds:
         controller.StartGameplay()
@@ -580,6 +600,7 @@ Allowed minimal behavior:
 * timer may have no UI
 * terminal outcome may only disable input and log/report result
 * startup failure may log a direct error
+* runtime spawning may clone scene-local templates instead of dedicated prefab assets for now
 
 Deliberately not included:
 
@@ -628,7 +649,8 @@ After this design is approved, implement only:
 
 * `DropTheManHoleView` MonoBehaviour implementing `IDropTheManHoleView`
 * `DropTheManStickmanView` MonoBehaviour implementing `IDropTheManStickmanView`
-* a narrow `DropTheManSceneController` or equivalent adapter that registers pre-placed views and starts gameplay
+* a narrow `DropTheManSceneController` or equivalent adapter that registers runtime-spawned views and starts gameplay
+* a narrow prototype-owned runtime view spawner invoked by the dev gameplay bootstrapper
 * a narrow pointer input adapter that owns hit-test and screen-to-world conversion
 * timer `Update()` forwarding through `DropTheManRuntimeController.TickTimer(...)`
 * terminal-result input disable behavior
@@ -638,7 +660,6 @@ Do not include:
 * scene or prefab polish beyond what is necessary to compile the adapters
 * animation
 * visual feedback framework
-* prefab spawning
 * event bus
 * level-loading UX
 * required-hole schema

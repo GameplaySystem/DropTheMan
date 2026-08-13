@@ -373,11 +373,29 @@ This prevents:
 * skipping same-color collectibles
 * frame-rate-dependent behavior
 
+### Drag Query Footprint Tolerance
+
+To improve narrow-corridor drag feel without changing authored puzzle truth, the actively dragged
+hole may use a configurable shape-aware drag query footprint during:
+
+* drag-time board-bound candidate clamping
+* drag-time swept overlap validation
+
+Rules:
+
+* authored footprint remains the real puzzle footprint
+* release snap, committed occupancy, capacity, JSON content, and level authoring remain exact
+* static blockers, stickmen, and passive holes remain exact
+* only the actively dragged hole receives the query-footprint inset
+* the inset must preserve the real footprint shape by shaving only exposed outer edges
+* shared internal edges between adjacent footprint cells remain exact
+* setting the inset to `0` restores exact old behavior
+
 The sweep should identify every board cell that the moving hole footprint crosses or overlaps along the movement segment.
 
 Board bounds are the only blocker category that may clamp the continuous candidate before the sweep.
-This keeps the full hole footprint inside the board and allows sliding along a board edge when the
-other axis remains valid.
+This keeps the dragged query footprint inside the board and allows sliding along a board edge when
+the other axis remains valid.
 
 Wrong-color collectibles, occupied cells, reserved cells, blocked cells, and inactive cells still
 block through swept validation. They must not become sliding boundaries unless a later approved
@@ -399,7 +417,7 @@ For each accepted drag update:
 1. Resolve the previous accepted hole position.
 2. Resolve the current continuous candidate hole position.
 3. Resolve the swept movement segment between them.
-4. Resolve the candidate footprint along that sweep.
+4. Resolve the candidate drag query footprint along that sweep.
 5. Check structural validity:
    * inside board
    * active cell

@@ -521,6 +521,7 @@ MonoBehaviour:
   pointerInputAdapter: {fileID: 1823423592}
   startGameplayOnInitialize: 1
   tickTimerInUpdate: 1
+  collectionTriggerRadiusInCells: 0.35
 --- !u!1 &1823423590
 GameObject:
   m_ObjectHideFlags: 0
@@ -622,16 +623,19 @@ MonoBehaviour:
   sceneController: {fileID: 1055129233}
   bootstrapOnStart: 1
   levelSource: 1
-  jsonLevelAsset: {fileID: 4900000, guid: 021095c44e7a45e89cc7f5ce5e3f1213, type: 3}
+  jsonLevelAsset: {fileID: 4900000, guid: 1a72361f77cd1364882973e9a46e7626, type: 3}
   boardWorldOrigin: {x: 0, y: 0, z: 0}
   cellSize: {x: 1, y: 1}
   boardGridXAxis: {x: 1, y: 0, z: 0}
   boardGridYAxis: {x: 0, y: 0, z: 1}
+  spawnRuntimeViews: 1
+  runtimeViewSpawnRoot: {fileID: 0}
   levelData:
     LevelId: drop_the_man_dev_minimal
     DisplayName: Drop The Man Dev Minimal
     BoardWidth: 5
     BoardHeight: 5
+    BlockedCells: []
     TimerEnabled: 0
     TimerDurationSeconds: 60
     TimerWarningThresholdSeconds: 0
