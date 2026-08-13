@@ -8,6 +8,14 @@ It consumes the shared `PuzzleFramework` package locally and owns Drop The Man-s
 
 Framework code must remain in `PuzzleFramework`. Game-specific nouns and behavior such as holes, stickmen, collection, capacity, and Drop The Man win timing belong in this repository.
 
+## Daily Milestone Workflow
+
+- Follow the project-level workflow at `PuzzleFramework/docs/Workflow/DailyMilestoneWorkflow.md` across both repositories.
+- At the beginning of a project day, establish and discuss one realistic daily milestone before non-trivial implementation.
+- Continue later tasks against the established daily plan; re-plan only when scope materially changes or a blocker invalidates it.
+- At the user's end-of-day signal, create or update `PuzzleFramework/docs/DailyReports/YYYY-MM-DD.md` using the canonical report template.
+- Never invent work-time or Codex-usage values. Record `Not tracked`, `User estimate needed`, or `Unavailable` when appropriate.
+
 ## Documentation Preflight Before Implementation
 
 Before implementing any non-trivial task, Codex must identify and read the documentation files relevant to that task.
