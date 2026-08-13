@@ -246,13 +246,30 @@ namespace DropAwayPrototype.Editor
             return true;
         }
 
+        public bool TryExportCurrentLevel(
+            string requestedPath,
+            out string resolvedAbsolutePath,
+            out string jsonText,
+            out string failureReason)
+        {
+            EnsureLevelDataInitialized();
+
+            return DropTheManEditorJsonExportUtility.TryExportToFile(
+                levelData,
+                requestedPath,
+                out resolvedAbsolutePath,
+                out jsonText,
+                out failureReason);
+        }
+
         public void SetLevelMetadata(string levelId, string displayName)
         {
             EnsureLevelDataInitialized();
 
             if (!string.IsNullOrWhiteSpace(levelId))
             {
-                levelData.LevelId = levelId.Trim();
+                levelData.LevelId =
+                    DropTheManEditorJsonExportUtility.NormalizeLevelId(levelId);
             }
 
             if (!string.IsNullOrWhiteSpace(displayName))
@@ -298,12 +315,12 @@ namespace DropAwayPrototype.Editor
 
             if (string.IsNullOrWhiteSpace(levelData.LevelId))
             {
-                levelData.LevelId = "drop_the_man_editor_level";
+                levelData.LevelId = "Level 1";
             }
 
             if (string.IsNullOrWhiteSpace(levelData.DisplayName))
             {
-                levelData.DisplayName = "Drop The Man Editor Level";
+                levelData.DisplayName = levelData.LevelId;
             }
         }
 

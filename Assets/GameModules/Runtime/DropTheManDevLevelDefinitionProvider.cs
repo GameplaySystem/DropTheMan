@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using PuzzleFramework.Content;
+using PuzzleFramework.Presentation;
 using UnityEngine;
 
 namespace DropAwayPrototype.Runtime
@@ -64,6 +65,18 @@ namespace DropAwayPrototype.Runtime
             DropTheManDevLevelData levelData,
             out string failureReason)
         {
+            if (levelData == null)
+            {
+                failureReason = "Drop The Man dev level data is required.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(levelData.LevelId))
+            {
+                failureReason = "Drop The Man dev level id is required.";
+                return false;
+            }
+
             if (levelData.BoardWidth <= 0 || levelData.BoardHeight <= 0)
             {
                 failureReason = "Dev board dimensions must be positive.";
@@ -88,7 +101,31 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (!TryValidateBlockedCells(levelData, out failureReason))
+            if (levelData.TimerWarningThresholdSeconds < 0f)
+            {
+                failureReason = "Dev timer warning threshold cannot be negative.";
+                return false;
+            }
+
+            if (!TryValidateBlockedCells(levelData, out HashSet<Vector2Int> blockedCells, out failureReason))
+            {
+                return false;
+            }
+
+            if (!TryValidateStickmen(
+                    levelData,
+                    blockedCells,
+                    out HashSet<Vector2Int> stickmanCoordinates,
+                    out failureReason))
+            {
+                return false;
+            }
+
+            if (!TryValidateHoles(
+                    levelData,
+                    blockedCells,
+                    stickmanCoordinates,
+                    out failureReason))
             {
                 return false;
             }
@@ -129,15 +166,17 @@ namespace DropAwayPrototype.Runtime
 
         private static bool TryValidateBlockedCells(
             DropTheManDevLevelData levelData,
+            out HashSet<Vector2Int> blockedCells,
             out string failureReason)
         {
+            blockedCells = new HashSet<Vector2Int>();
+
             if (levelData.BlockedCells == null)
             {
                 failureReason = string.Empty;
                 return true;
             }
 
-            HashSet<Vector2Int> uniqueBlockedCells = new();
             for (int i = 0; i < levelData.BlockedCells.Count; i++)
             {
                 Vector2Int coordinate = levelData.BlockedCells[i];
@@ -149,7 +188,7 @@ namespace DropAwayPrototype.Runtime
                     return false;
                 }
 
-                if (!uniqueBlockedCells.Add(coordinate))
+                if (!blockedCells.Add(coordinate))
                 {
                     failureReason =
                         $"Blocked cells contain a duplicate authored coordinate at ({coordinate.x}, {coordinate.y}).";
@@ -159,6 +198,185 @@ namespace DropAwayPrototype.Runtime
 
             failureReason = string.Empty;
             return true;
+        }
+
+        private static bool TryValidateStickmen(
+            DropTheManDevLevelData levelData,
+            HashSet<Vector2Int> blockedCells,
+            out HashSet<Vector2Int> stickmanCoordinates,
+            out string failureReason)
+        {
+            stickmanCoordinates = new HashSet<Vector2Int>();
+            HashSet<string> uniqueStickmanIds = new();
+
+            for (int i = 0; i < levelData.Stickmen.Count; i++)
+            {
+                DropTheManDevStickmanData stickman = levelData.Stickmen[i];
+                if (stickman == null)
+                {
+                    failureReason = $"Dev stickman at index {i} is null.";
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(stickman.Id))
+                {
+                    failureReason = $"Dev stickman at index {i} must include an id.";
+                    return false;
+                }
+
+                if (!uniqueStickmanIds.Add(stickman.Id))
+                {
+                    failureReason = $"Dev stickmen contain a duplicate id '{stickman.Id}'.";
+                    return false;
+                }
+
+                if (stickman.ColorIdentity == ColorIdentity.None)
+                {
+                    failureReason = $"Dev stickman '{stickman.Id}' must use a supported color identity.";
+                    return false;
+                }
+
+                if (!IsWithinBoard(stickman.Coordinate, levelData))
+                {
+                    failureReason =
+                        $"Dev stickman '{stickman.Id}' is outside the declared board dimensions.";
+                    return false;
+                }
+
+                if (blockedCells.Contains(stickman.Coordinate))
+                {
+                    failureReason =
+                        $"Dev stickman '{stickman.Id}' is authored on blocked coordinate ({stickman.Coordinate.x}, {stickman.Coordinate.y}).";
+                    return false;
+                }
+
+                if (!stickmanCoordinates.Add(stickman.Coordinate))
+                {
+                    failureReason =
+                        $"Dev stickmen contain a duplicate coordinate at ({stickman.Coordinate.x}, {stickman.Coordinate.y}).";
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateHoles(
+            DropTheManDevLevelData levelData,
+            HashSet<Vector2Int> blockedCells,
+            HashSet<Vector2Int> stickmanCoordinates,
+            out string failureReason)
+        {
+            HashSet<string> uniqueHoleIds = new();
+            Dictionary<Vector2Int, string> occupiedHoleCells = new();
+
+            for (int i = 0; i < levelData.Holes.Count; i++)
+            {
+                DropTheManDevHoleData hole = levelData.Holes[i];
+                if (hole == null)
+                {
+                    failureReason = $"Dev hole at index {i} is null.";
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(hole.Id))
+                {
+                    failureReason = $"Dev hole at index {i} must include an id.";
+                    return false;
+                }
+
+                if (!uniqueHoleIds.Add(hole.Id))
+                {
+                    failureReason = $"Dev holes contain a duplicate id '{hole.Id}'.";
+                    return false;
+                }
+
+                if (hole.ColorIdentity == ColorIdentity.None)
+                {
+                    failureReason = $"Dev hole '{hole.Id}' must use a supported color identity.";
+                    return false;
+                }
+
+                IReadOnlyList<Vector2Int> footprintOffsets =
+                    ResolveFootprintOffsets(hole.FootprintOffsets);
+                for (int offsetIndex = 0; offsetIndex < footprintOffsets.Count; offsetIndex++)
+                {
+                    Vector2Int coordinate = hole.Coordinate + footprintOffsets[offsetIndex];
+                    if (!IsWithinBoard(coordinate, levelData))
+                    {
+                        failureReason =
+                            $"Dev hole '{hole.Id}' has footprint cell ({coordinate.x}, {coordinate.y}) outside the declared board dimensions.";
+                        return false;
+                    }
+
+                    if (blockedCells.Contains(coordinate))
+                    {
+                        failureReason =
+                            $"Dev hole '{hole.Id}' overlaps blocked coordinate ({coordinate.x}, {coordinate.y}).";
+                        return false;
+                    }
+
+                    if (stickmanCoordinates.Contains(coordinate))
+                    {
+                        failureReason =
+                            $"Dev hole '{hole.Id}' overlaps stickman coordinate ({coordinate.x}, {coordinate.y}).";
+                        return false;
+                    }
+
+                    if (occupiedHoleCells.TryGetValue(coordinate, out string overlappingHoleId))
+                    {
+                        failureReason =
+                            $"Dev hole '{hole.Id}' overlaps hole '{overlappingHoleId}' at coordinate ({coordinate.x}, {coordinate.y}).";
+                        return false;
+                    }
+
+                    occupiedHoleCells.Add(coordinate, hole.Id);
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static IReadOnlyList<Vector2Int> ResolveFootprintOffsets(
+            IReadOnlyList<Vector2Int> sourceOffsets)
+        {
+            HashSet<Vector2Int> uniqueOffsets = new();
+            List<Vector2Int> offsets = new();
+
+            if (sourceOffsets != null)
+            {
+                for (int i = 0; i < sourceOffsets.Count; i++)
+                {
+                    if (uniqueOffsets.Add(sourceOffsets[i]))
+                    {
+                        offsets.Add(sourceOffsets[i]);
+                    }
+                }
+            }
+
+            if (!uniqueOffsets.Contains(Vector2Int.zero))
+            {
+                offsets.Insert(0, Vector2Int.zero);
+            }
+
+            if (offsets.Count == 0)
+            {
+                offsets.Add(Vector2Int.zero);
+            }
+
+            return offsets;
+        }
+
+        private static bool IsWithinBoard(
+            Vector2Int coordinate,
+            DropTheManDevLevelData levelData)
+        {
+            return coordinate.x >= 0 &&
+                   coordinate.x < levelData.BoardWidth &&
+                   coordinate.y >= 0 &&
+                   coordinate.y < levelData.BoardHeight;
         }
 
         private static DropTheManLevelContentPayload BuildPayload(

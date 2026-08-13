@@ -11,10 +11,11 @@ namespace DropAwayPrototype.Editor
     [DisallowMultipleComponent]
     public sealed class DropTheManLevelEditorHud : MonoBehaviour
     {
-        private readonly Rect _panelRect = new(12f, 12f, 400f, 360f);
+        private readonly Rect _panelRect = new(12f, 12f, 430f, 420f);
 
         private DropTheManLevelEditorRuntimeController _runtimeController;
         private DropTheManEditorBoardController _boardController;
+        private Vector2 _scrollPosition;
         private string _levelIdInput = string.Empty;
         private string _displayNameInput = string.Empty;
         private string _boardWidthInput = "5";
@@ -22,6 +23,8 @@ namespace DropAwayPrototype.Editor
         private bool _timerEnabledInput;
         private string _timerDurationInput = "60";
         private string _timerWarningInput = "0";
+        private string _exportPathInput = string.Empty;
+        private string _lastSuggestedExportPath = string.Empty;
         private string _statusMessage = string.Empty;
         private bool _fieldsInitialized;
 
@@ -46,7 +49,9 @@ namespace DropAwayPrototype.Editor
             }
 
             DropTheManDevLevelData levelData = _boardController.LevelData;
-            _levelIdInput = levelData.LevelId ?? string.Empty;
+            _levelIdInput =
+                DropTheManEditorJsonExportUtility.BuildLevelIdFieldDisplayValue(
+                    levelData.LevelId);
             _displayNameInput = levelData.DisplayName ?? string.Empty;
             _boardWidthInput = levelData.BoardWidth.ToString(CultureInfo.InvariantCulture);
             _boardHeightInput = levelData.BoardHeight.ToString(CultureInfo.InvariantCulture);
@@ -55,6 +60,7 @@ namespace DropAwayPrototype.Editor
                 levelData.TimerDurationSeconds.ToString(CultureInfo.InvariantCulture);
             _timerWarningInput =
                 levelData.TimerWarningThresholdSeconds.ToString(CultureInfo.InvariantCulture);
+            RefreshSuggestedExportPath();
             _fieldsInitialized = true;
         }
 
@@ -88,6 +94,12 @@ namespace DropAwayPrototype.Editor
             DropTheManDevLevelData levelData = _boardController.LevelData;
 
             GUILayout.BeginArea(_panelRect, GUI.skin.window);
+            _scrollPosition = GUILayout.BeginScrollView(
+                _scrollPosition,
+                false,
+                true,
+                GUILayout.Width(_panelRect.width - 8f),
+                GUILayout.Height(_panelRect.height - 28f));
             GUILayout.Label("Drop The Man Level Editor");
             GUILayout.Space(4f);
             GUILayout.Label(
@@ -134,12 +146,21 @@ namespace DropAwayPrototype.Editor
             GUILayout.Label("Mouse: Left place, Right erase, Wheel cycle hole palette");
             GUILayout.Label("This scene authors level data only. Gameplay play/test is separate.");
 
+            GUILayout.Space(8f);
+            GUILayout.Label("Export Path");
+            _exportPathInput = GUILayout.TextField(_exportPathInput);
+            if (GUILayout.Button("Save / Export JSON", GUILayout.Width(160f)))
+            {
+                ExportJson();
+            }
+
             if (!string.IsNullOrWhiteSpace(_statusMessage))
             {
                 GUILayout.Space(6f);
                 GUILayout.Label(_statusMessage);
             }
 
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
         }
 
@@ -203,6 +224,53 @@ namespace DropAwayPrototype.Editor
                 warningThresholdSeconds);
             SyncEditableFieldsFromBoard();
             _statusMessage = "Level metadata and timer fields applied.";
+        }
+
+        private void ExportJson()
+        {
+            if (_boardController == null)
+            {
+                _statusMessage = "Board controller not found.";
+                return;
+            }
+
+            ApplyMetadataAndTimer();
+            if (_statusMessage is "Level Id cannot be empty." or
+                "Display Name cannot be empty." or
+                "Timer fields must be valid numbers.")
+            {
+                return;
+            }
+
+            if (!_boardController.TryExportCurrentLevel(
+                    _exportPathInput,
+                    out string resolvedAbsolutePath,
+                    out _,
+                    out string failureReason))
+            {
+                _statusMessage = failureReason;
+                Debug.LogWarning(failureReason, _boardController);
+                return;
+            }
+
+            _statusMessage = $"Exported JSON to {resolvedAbsolutePath}";
+            Debug.Log(
+                $"Drop The Man editor exported JSON to '{resolvedAbsolutePath}'.",
+                _boardController);
+        }
+
+        private void RefreshSuggestedExportPath()
+        {
+            string suggestedPath =
+                DropTheManEditorJsonExportUtility.BuildSuggestedProjectRelativeExportPath(
+                    _levelIdInput);
+            if (string.IsNullOrWhiteSpace(_exportPathInput) ||
+                _exportPathInput == _lastSuggestedExportPath)
+            {
+                _exportPathInput = suggestedPath;
+            }
+
+            _lastSuggestedExportPath = suggestedPath;
         }
     }
 }

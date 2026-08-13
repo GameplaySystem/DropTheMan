@@ -489,12 +489,52 @@ Phase 2 still should not implement:
 The following are intentionally deferred:
 
 * hole palette preview UX
+* load/import UI
+* gameplay play/test bridge
 * inactive-cell authoring mode
 * gameplay play/test behavior
 * runtime view spawning
 * runtime preview scene generation
 * undo or redo
 * generic plugin-style editor extensibility
+
+---
+
+## Phase 3A Scope
+
+Phase 3A adds the first save/export path from the dedicated play-mode authoring scene.
+
+Phase 3A should implement:
+
+* a temporary `OnGUI` save/export action in the play-mode HUD
+* export of the current authored `DropTheManDevLevelData`
+* reuse of the existing `Drop The Man` JSON schema and export helper path
+* file output to a simple project-local path such as `Assets/GameModules/Levels/EditorExports/...`
+* useful success or failure reporting to the HUD and Console
+* validation that rejects invalid authored data before writing JSON
+
+Phase 3A still should not implement:
+
+* load/import UI
+* gameplay play/test bridge
+* runtime spawning from exported JSON
+* collection timing
+* polished Canvas/TMP HUD
+* generic framework editor save/export tooling
+
+Ownership rule:
+
+* the board controller remains the source of authored data
+* the HUD may trigger export
+* the existing prototype-owned JSON provider remains the owner of schema conversion
+* file writing remains prototype-owned and must not add Drop The Man-specific logic to `PuzzleFramework`
+* default export naming should derive from the current `Level Id` so repeated exports do not collapse into one ambiguous fixed filename
+
+Current naming direction:
+
+* simple authored `Level Id` values such as `Level 1`, `Level 2`, and `Level 3` are acceptable for this phase
+* the HUD may accept numeric shorthand such as `1`, `2`, or `3` and normalize that into canonical stored ids such as `Level 1`, `Level 2`, or `Level 3`
+* the suggested export filename should normalize that id into a safe file name such as `level_1.json`
 
 ---
 
@@ -528,4 +568,11 @@ Phase 2 adds:
 * lightweight runtime HUD/debug UI
 * lightweight right-click erasing
 
-Gameplay play/test behavior, runtime spawning, and collection timing remain separate future slices.
+Phase 3A adds:
+
+* a first Save/Export action in the play-mode HUD
+* JSON export of current authored level data using the existing Drop The Man JSON schema
+* project-local file writing for later inspection and future load-path reuse
+* validation-backed export failure reporting without changing authored data
+
+Gameplay play/test behavior, load/import UI, runtime spawning, and collection timing remain separate future slices.

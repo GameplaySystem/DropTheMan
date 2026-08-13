@@ -1,0 +1,76 @@
+{
+    "FormatVersion": 1,
+    "LevelId": "Level 2",
+    "DisplayName": "Drop The Man Dev Minimal",
+    "Board": {
+        "Width": 5,
+        "Height": 5,
+        "BlockedCells": [
+            {
+                "X": 3,
+                "Y": 4
+            },
+            {
+                "X": 4,
+                "Y": 4
+            },
+            {
+                "X": 4,
+                "Y": 3
+            }
+        ]
+    },
+    "Timer": {
+        "Enabled": false,
+        "DurationSeconds": 60.0,
+        "WarningThresholdSeconds": 0.0
+    },
+    "Holes": [
+        {
+            "Id": "hole_001",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 0,
+                "Y": 4
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                }
+            ]
+        },
+        {
+            "Id": "hole_002",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 1,
+                "Y": 4
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                }
+            ]
+        }
+    ],
+    "Stickmen": [
+        {
+            "Id": "stickman_001",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 2,
+                "Y": 4
+            }
+        },
+        {
+            "Id": "stickman_002",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 2,
+                "Y": 3
+            }
+        }
+    ]
+}

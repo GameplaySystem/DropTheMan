@@ -12,8 +12,8 @@ namespace DropAwayPrototype.Runtime
     [Serializable]
     public sealed class DropTheManDevLevelData
     {
-        public string LevelId = "drop_the_man_dev_minimal";
-        public string DisplayName = "Drop The Man Dev Minimal";
+        public string LevelId = "Level 1";
+        public string DisplayName = "Level 1";
         public int BoardWidth = 5;
         public int BoardHeight = 5;
         public List<Vector2Int> BlockedCells = new();
