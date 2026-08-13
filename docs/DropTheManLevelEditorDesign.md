@@ -484,22 +484,6 @@ Phase 2 still should not implement:
 
 ---
 
-## Deferred Work
-
-The following are intentionally deferred:
-
-* hole palette preview UX
-* load/import UI
-* gameplay play/test bridge
-* inactive-cell authoring mode
-* gameplay play/test behavior
-* runtime view spawning
-* runtime preview scene generation
-* undo or redo
-* generic plugin-style editor extensibility
-
----
-
 ## Phase 3A Scope
 
 Phase 3A adds the first save/export path from the dedicated play-mode authoring scene.
@@ -535,6 +519,61 @@ Current naming direction:
 * simple authored `Level Id` values such as `Level 1`, `Level 2`, and `Level 3` are acceptable for this phase
 * the HUD may accept numeric shorthand such as `1`, `2`, or `3` and normalize that into canonical stored ids such as `Level 1`, `Level 2`, or `Level 3`
 * the suggested export filename should normalize that id into a safe file name such as `level_1.json`
+
+---
+
+## Phase 3B Scope
+
+Phase 3B adds the first import/load path back into the dedicated play-mode authoring scene.
+
+Phase 3B should implement:
+
+* a temporary `OnGUI` load/import action in the play-mode HUD
+* reuse of the same simple JSON path field for both export and import
+* support for both project-relative and absolute file paths
+* reuse of the existing `Drop The Man` JSON schema/provider path for parsing and conversion
+* atomic replacement of the current authored `DropTheManDevLevelData` only after import succeeds
+* restore of:
+  * `LevelId`
+  * `DisplayName`
+  * board width and height
+  * blocked cells
+  * timer fields
+  * holes with ids, colors, coordinates, and footprint offsets
+  * stickmen with ids, colors, and coordinates
+* board-visual and placement-visual rebuild after imported data is applied
+* useful HUD and Console failure reporting without mutating current authored data
+
+Phase 3B still should not implement:
+
+* gameplay play/test bridge
+* runtime spawning from imported JSON
+* collection timing
+* polished Canvas/TMP HUD
+* production file-browser UX
+* generic framework import tooling
+
+Ownership rule:
+
+* the HUD may trigger import
+* the existing prototype-owned JSON provider remains the owner of schema parsing and schema-to-authored-data conversion
+* the board controller remains the owner of applying imported authored data and rebuilding visuals
+* failed import should leave the current authored level state unchanged
+
+---
+
+## Deferred Work
+
+The following are intentionally deferred:
+
+* hole palette preview UX
+* gameplay play/test bridge
+* inactive-cell authoring mode
+* gameplay play/test behavior
+* runtime view spawning
+* runtime preview scene generation
+* undo or redo
+* generic plugin-style editor extensibility
 
 ---
 
@@ -575,4 +614,12 @@ Phase 3A adds:
 * project-local file writing for later inspection and future load-path reuse
 * validation-backed export failure reporting without changing authored data
 
-Gameplay play/test behavior, load/import UI, runtime spawning, and collection timing remain separate future slices.
+Phase 3B adds:
+
+* a first Load/Import action in the play-mode HUD
+* shared JSON path handling for both export and import
+* JSON-to-authored-data restore using the existing Drop The Man schema/provider path
+* atomic authored-data replacement plus board visual rebuild after successful import
+* validation-backed import failure reporting without changing authored data
+
+Gameplay play/test behavior, runtime spawning, and collection timing remain separate future slices.

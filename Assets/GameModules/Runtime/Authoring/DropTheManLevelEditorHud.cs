@@ -111,7 +111,13 @@ namespace DropAwayPrototype.Editor
             GUILayout.Space(8f);
 
             GUILayout.Label("Level Id");
-            _levelIdInput = GUILayout.TextField(_levelIdInput);
+            string nextLevelIdInput = GUILayout.TextField(_levelIdInput);
+            if (!string.Equals(nextLevelIdInput, _levelIdInput, System.StringComparison.Ordinal))
+            {
+                _levelIdInput = nextLevelIdInput;
+                RefreshSuggestedExportPath();
+            }
+
             GUILayout.Label("Display Name");
             _displayNameInput = GUILayout.TextField(_displayNameInput);
 
@@ -147,12 +153,20 @@ namespace DropAwayPrototype.Editor
             GUILayout.Label("This scene authors level data only. Gameplay play/test is separate.");
 
             GUILayout.Space(8f);
-            GUILayout.Label("Export Path");
+            GUILayout.Label("JSON Path");
             _exportPathInput = GUILayout.TextField(_exportPathInput);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Load / Import JSON", GUILayout.Width(160f)))
+            {
+                ImportJson();
+            }
+
             if (GUILayout.Button("Save / Export JSON", GUILayout.Width(160f)))
             {
                 ExportJson();
             }
+
+            GUILayout.EndHorizontal();
 
             if (!string.IsNullOrWhiteSpace(_statusMessage))
             {
@@ -190,16 +204,26 @@ namespace DropAwayPrototype.Editor
 
         private void ApplyMetadataAndTimer()
         {
+            if (TryApplyMetadataAndTimer(out string successMessage))
+            {
+                _statusMessage = successMessage;
+            }
+        }
+
+        private bool TryApplyMetadataAndTimer(out string successMessage)
+        {
             if (string.IsNullOrWhiteSpace(_levelIdInput))
             {
                 _statusMessage = "Level Id cannot be empty.";
-                return;
+                successMessage = string.Empty;
+                return false;
             }
 
             if (string.IsNullOrWhiteSpace(_displayNameInput))
             {
                 _statusMessage = "Display Name cannot be empty.";
-                return;
+                successMessage = string.Empty;
+                return false;
             }
 
             if (!float.TryParse(
@@ -214,7 +238,8 @@ namespace DropAwayPrototype.Editor
                     out float warningThresholdSeconds))
             {
                 _statusMessage = "Timer fields must be valid numbers.";
-                return;
+                successMessage = string.Empty;
+                return false;
             }
 
             _boardController.SetLevelMetadata(_levelIdInput, _displayNameInput);
@@ -223,7 +248,35 @@ namespace DropAwayPrototype.Editor
                 durationSeconds,
                 warningThresholdSeconds);
             SyncEditableFieldsFromBoard();
-            _statusMessage = "Level metadata and timer fields applied.";
+            successMessage = "Level metadata and timer fields applied.";
+            return true;
+        }
+
+        private void ImportJson()
+        {
+            if (_boardController == null)
+            {
+                _statusMessage = "Board controller not found.";
+                return;
+            }
+
+            RefreshSuggestedExportPath();
+
+            if (!_boardController.TryImportLevelFromPath(
+                    _exportPathInput,
+                    out string resolvedAbsolutePath,
+                    out string failureReason))
+            {
+                _statusMessage = failureReason;
+                Debug.LogWarning(failureReason, _boardController);
+                return;
+            }
+
+            SyncEditableFieldsFromBoard();
+            _statusMessage = $"Imported JSON from {resolvedAbsolutePath}";
+            Debug.Log(
+                $"Drop The Man editor imported JSON from '{resolvedAbsolutePath}'.",
+                _boardController);
         }
 
         private void ExportJson()
@@ -234,10 +287,7 @@ namespace DropAwayPrototype.Editor
                 return;
             }
 
-            ApplyMetadataAndTimer();
-            if (_statusMessage is "Level Id cannot be empty." or
-                "Display Name cannot be empty." or
-                "Timer fields must be valid numbers.")
+            if (!TryApplyMetadataAndTimer(out _))
             {
                 return;
             }

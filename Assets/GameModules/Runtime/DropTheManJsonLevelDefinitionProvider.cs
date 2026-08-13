@@ -71,6 +71,34 @@ namespace DropAwayPrototype.Runtime
             return true;
         }
 
+        public static bool TryImportJsonToDevLevelData(
+            string jsonText,
+            out DropTheManDevLevelData devLevelData,
+            out string failureReason)
+        {
+            devLevelData = null;
+
+            if (!TryParseJson(jsonText, out DropTheManJsonLevelData jsonData, out failureReason))
+            {
+                return false;
+            }
+
+            if (!TryConvertToDevLevelData(jsonData, out devLevelData, out failureReason))
+            {
+                return false;
+            }
+
+            DropTheManDevLevelDefinitionProvider validationProvider = new(devLevelData);
+            if (!validationProvider.TryGetLevelDefinition(out _, out failureReason))
+            {
+                devLevelData = null;
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
         private static bool TryParseJson(
             string jsonText,
             out DropTheManJsonLevelData jsonData,

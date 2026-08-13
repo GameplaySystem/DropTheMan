@@ -262,6 +262,25 @@ namespace DropAwayPrototype.Editor
                 out failureReason);
         }
 
+        public bool TryImportLevelFromPath(
+            string requestedPath,
+            out string resolvedAbsolutePath,
+            out string failureReason)
+        {
+            if (!DropTheManEditorJsonExportUtility.TryImportFromFile(
+                    requestedPath,
+                    out DropTheManDevLevelData importedLevelData,
+                    out resolvedAbsolutePath,
+                    out failureReason))
+            {
+                return false;
+            }
+
+            ApplyImportedLevelData(importedLevelData);
+            failureReason = string.Empty;
+            return true;
+        }
+
         public void SetLevelMetadata(string levelId, string displayName)
         {
             EnsureLevelDataInitialized();
@@ -322,6 +341,12 @@ namespace DropAwayPrototype.Editor
             {
                 levelData.DisplayName = levelData.LevelId;
             }
+        }
+
+        private void ApplyImportedLevelData(DropTheManDevLevelData importedLevelData)
+        {
+            levelData = CloneLevelData(importedLevelData);
+            RefreshVisuals();
         }
 
         private void ClampSelection()
@@ -1071,6 +1096,73 @@ namespace DropAwayPrototype.Editor
             }
 
             return candidate;
+        }
+
+        private static DropTheManDevLevelData CloneLevelData(DropTheManDevLevelData source)
+        {
+            DropTheManDevLevelData clone = new()
+            {
+                LevelId = source?.LevelId ?? "Level 1",
+                DisplayName = source?.DisplayName ?? source?.LevelId ?? "Level 1",
+                BoardWidth = Mathf.Max(1, source?.BoardWidth ?? 5),
+                BoardHeight = Mathf.Max(1, source?.BoardHeight ?? 5),
+                TimerEnabled = source != null && source.TimerEnabled,
+                TimerDurationSeconds = source?.TimerDurationSeconds ?? 60f,
+                TimerWarningThresholdSeconds = source?.TimerWarningThresholdSeconds ?? 0f,
+                BlockedCells = new List<Vector2Int>(),
+                Holes = new List<DropTheManDevHoleData>(),
+                Stickmen = new List<DropTheManDevStickmanData>()
+            };
+
+            if (source?.BlockedCells != null)
+            {
+                clone.BlockedCells.AddRange(source.BlockedCells);
+            }
+
+            if (source?.Holes != null)
+            {
+                for (int i = 0; i < source.Holes.Count; i++)
+                {
+                    DropTheManDevHoleData sourceHole = source.Holes[i];
+                    if (sourceHole == null)
+                    {
+                        continue;
+                    }
+
+                    clone.Holes.Add(
+                        new DropTheManDevHoleData
+                        {
+                            Id = sourceHole.Id,
+                            Coordinate = sourceHole.Coordinate,
+                            ColorIdentity = sourceHole.ColorIdentity,
+                            FootprintOffsets = sourceHole.FootprintOffsets != null
+                                ? new List<Vector2Int>(sourceHole.FootprintOffsets)
+                                : new List<Vector2Int> { Vector2Int.zero }
+                        });
+                }
+            }
+
+            if (source?.Stickmen != null)
+            {
+                for (int i = 0; i < source.Stickmen.Count; i++)
+                {
+                    DropTheManDevStickmanData sourceStickman = source.Stickmen[i];
+                    if (sourceStickman == null)
+                    {
+                        continue;
+                    }
+
+                    clone.Stickmen.Add(
+                        new DropTheManDevStickmanData
+                        {
+                            Id = sourceStickman.Id,
+                            Coordinate = sourceStickman.Coordinate,
+                            ColorIdentity = sourceStickman.ColorIdentity
+                        });
+                }
+            }
+
+            return clone;
         }
 
         public static bool TryMapKeyCodeToColorSlot(KeyCode keyCode, out ColorIdentity colorIdentity)

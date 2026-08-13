@@ -102,6 +102,49 @@ namespace DropAwayPrototype.Editor
             return true;
         }
 
+        public static bool TryImportFromFile(
+            string requestedPath,
+            out DropTheManDevLevelData levelData,
+            out string resolvedAbsolutePath,
+            out string failureReason)
+        {
+            levelData = null;
+            resolvedAbsolutePath = string.Empty;
+
+            string importPath = string.IsNullOrWhiteSpace(requestedPath)
+                ? BuildSuggestedProjectRelativeExportPath("Level 2")
+                : requestedPath;
+
+            if (!TryResolveAbsolutePath(importPath, out resolvedAbsolutePath, out failureReason))
+            {
+                return false;
+            }
+
+            if (!File.Exists(resolvedAbsolutePath))
+            {
+                failureReason =
+                    $"Drop The Man JSON import file was not found at '{resolvedAbsolutePath}'.";
+                return false;
+            }
+
+            string jsonText;
+            try
+            {
+                jsonText = File.ReadAllText(resolvedAbsolutePath);
+            }
+            catch (Exception exception)
+            {
+                failureReason =
+                    $"Drop The Man JSON import could not read '{resolvedAbsolutePath}': {exception.Message}";
+                return false;
+            }
+
+            return DropTheManJsonLevelDefinitionProvider.TryImportJsonToDevLevelData(
+                jsonText,
+                out levelData,
+                out failureReason);
+        }
+
         public static string BuildSuggestedFileStem(string levelId)
         {
             string source = NormalizeLevelId(levelId);
@@ -177,7 +220,7 @@ namespace DropAwayPrototype.Editor
             return true;
         }
 
-        private static bool TryResolveAbsolutePath(
+        public static bool TryResolveAbsolutePath(
             string requestedPath,
             out string absolutePath,
             out string failureReason)
