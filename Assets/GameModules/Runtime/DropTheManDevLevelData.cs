@@ -16,6 +16,7 @@ namespace DropAwayPrototype.Runtime
         public string DisplayName = "Drop The Man Dev Minimal";
         public int BoardWidth = 5;
         public int BoardHeight = 5;
+        public List<Vector2Int> BlockedCells = new();
         public bool TimerEnabled;
         public float TimerDurationSeconds = 60f;
         public float TimerWarningThresholdSeconds;

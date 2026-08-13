@@ -24,6 +24,7 @@ namespace DropAwayPrototype.Runtime
     {
         public int Width;
         public int Height;
+        public List<DropTheManJsonCoordinateData> BlockedCells = new();
     }
 
     [Serializable]

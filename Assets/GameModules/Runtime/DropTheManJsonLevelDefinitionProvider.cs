@@ -128,6 +128,16 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (!TryValidateBoardCoordinateList(
+                    jsonData.Board.BlockedCells,
+                    jsonData.Board.Width,
+                    jsonData.Board.Height,
+                    "blocked cell",
+                    out failureReason))
+            {
+                return false;
+            }
+
             if (jsonData.Timer != null &&
                 jsonData.Timer.Enabled &&
                 jsonData.Timer.DurationSeconds <= 0f)
@@ -174,6 +184,15 @@ namespace DropAwayPrototype.Runtime
                     : 0f
             };
 
+            if (jsonData.Board.BlockedCells != null)
+            {
+                for (int i = 0; i < jsonData.Board.BlockedCells.Count; i++)
+                {
+                    DropTheManJsonCoordinateData blockedCell = jsonData.Board.BlockedCells[i];
+                    devLevelData.BlockedCells.Add(new Vector2Int(blockedCell.X, blockedCell.Y));
+                }
+            }
+
             if (!TryConvertHoles(jsonData.Holes, devLevelData.Holes, out failureReason))
             {
                 return false;
@@ -182,6 +201,50 @@ namespace DropAwayPrototype.Runtime
             if (!TryConvertStickmen(jsonData.Stickmen, devLevelData.Stickmen, out failureReason))
             {
                 return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateBoardCoordinateList(
+            IReadOnlyList<DropTheManJsonCoordinateData> coordinates,
+            int boardWidth,
+            int boardHeight,
+            string label,
+            out string failureReason)
+        {
+            if (coordinates == null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            HashSet<string> uniqueCoordinates = new();
+            for (int i = 0; i < coordinates.Count; i++)
+            {
+                DropTheManJsonCoordinateData coordinate = coordinates[i];
+                if (coordinate == null)
+                {
+                    failureReason = $"Drop The Man JSON {label} at index {i} is null.";
+                    return false;
+                }
+
+                if (coordinate.X < 0 || coordinate.X >= boardWidth ||
+                    coordinate.Y < 0 || coordinate.Y >= boardHeight)
+                {
+                    failureReason =
+                        $"Drop The Man JSON {label} at index {i} is outside the declared board dimensions.";
+                    return false;
+                }
+
+                string coordinateKey = $"{coordinate.X},{coordinate.Y}";
+                if (!uniqueCoordinates.Add(coordinateKey))
+                {
+                    failureReason =
+                        $"Drop The Man JSON {label} list contains duplicate coordinate {coordinateKey}.";
+                    return false;
+                }
             }
 
             failureReason = string.Empty;
@@ -347,6 +410,20 @@ namespace DropAwayPrototype.Runtime
                     WarningThresholdSeconds = levelData.TimerWarningThresholdSeconds
                 }
             };
+
+            if (levelData.BlockedCells != null)
+            {
+                for (int i = 0; i < levelData.BlockedCells.Count; i++)
+                {
+                    Vector2Int blockedCell = levelData.BlockedCells[i];
+                    jsonData.Board.BlockedCells.Add(
+                        new DropTheManJsonCoordinateData
+                        {
+                            X = blockedCell.x,
+                            Y = blockedCell.y
+                        });
+                }
+            }
 
             for (int i = 0; i < levelData.Holes.Count; i++)
             {

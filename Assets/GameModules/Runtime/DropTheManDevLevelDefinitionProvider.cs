@@ -88,6 +88,11 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (!TryValidateBlockedCells(levelData, out failureReason))
+            {
+                return false;
+            }
+
             failureReason = string.Empty;
             return true;
         }
@@ -100,6 +105,10 @@ namespace DropAwayPrototype.Runtime
                 Height = levelData.BoardHeight
             };
 
+            HashSet<Vector2Int> blockedCells = levelData.BlockedCells != null
+                ? new HashSet<Vector2Int>(levelData.BlockedCells)
+                : null;
+
             for (int y = 0; y < levelData.BoardHeight; y++)
             {
                 for (int x = 0; x < levelData.BoardWidth; x++)
@@ -108,12 +117,48 @@ namespace DropAwayPrototype.Runtime
                         new CellDefinitionData
                         {
                             Coordinate = new CellCoordinateData { X = x, Y = y },
-                            CellState = AuthoredCellState.Active
+                            CellState = blockedCells != null && blockedCells.Contains(new Vector2Int(x, y))
+                                ? AuthoredCellState.Blocked
+                                : AuthoredCellState.Active
                         });
                 }
             }
 
             return board;
+        }
+
+        private static bool TryValidateBlockedCells(
+            DropTheManDevLevelData levelData,
+            out string failureReason)
+        {
+            if (levelData.BlockedCells == null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            HashSet<Vector2Int> uniqueBlockedCells = new();
+            for (int i = 0; i < levelData.BlockedCells.Count; i++)
+            {
+                Vector2Int coordinate = levelData.BlockedCells[i];
+                if (coordinate.x < 0 || coordinate.x >= levelData.BoardWidth ||
+                    coordinate.y < 0 || coordinate.y >= levelData.BoardHeight)
+                {
+                    failureReason =
+                        $"Blocked cell at index {i} is outside the declared board dimensions.";
+                    return false;
+                }
+
+                if (!uniqueBlockedCells.Add(coordinate))
+                {
+                    failureReason =
+                        $"Blocked cells contain a duplicate authored coordinate at ({coordinate.x}, {coordinate.y}).";
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
         }
 
         private static DropTheManLevelContentPayload BuildPayload(
