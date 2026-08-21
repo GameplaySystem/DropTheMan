@@ -1,5 +1,6 @@
 using PuzzleFramework.Content;
 using PuzzleFramework.CoreBoard;
+using PuzzleFramework.Presentation;
 using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
@@ -32,6 +33,10 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
         [SerializeField] private bool spawnRuntimeViews = true;
         [SerializeField] private Transform runtimeViewSpawnRoot;
+        [Header("Generated Board Visuals")]
+        [SerializeField] private ModularBoardCellView boardCellVisualPrefab;
+        [SerializeField] private Transform boardVisualSpawnRoot;
+        [SerializeField] private float boardVisualNormalOffset;
         [SerializeField] private DropTheManDevLevelData levelData =
             DropTheManDevLevelData.CreateDefault();
 
@@ -289,6 +294,14 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (!TryRebuildBoardVisuals(
+                    frameworkBuildResult.Context.BoardData,
+                    worldLayout,
+                    out failureReason))
+            {
+                return false;
+            }
+
             DropTheManRuntimeControllerResult sceneInitializeResult =
                 InitializeSceneController(
                     modelBuildResult.RuntimeModel,
@@ -362,6 +375,64 @@ namespace DropAwayPrototype.Runtime
                     timerSystem);
             failureReason = initializeResult.FailureReason;
             return initializeResult;
+        }
+
+        private bool TryRebuildBoardVisuals(
+            RuntimeConstructionBoardData boardData,
+            GridWorldLayout worldLayout,
+            out string failureReason)
+        {
+            if (boardCellVisualPrefab == null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            try
+            {
+                List<GridCoordinate> participatingCoordinates =
+                    DropTheManBoardVisualParticipationMapper.CreateFromRuntimeData(boardData);
+                WallGenerationResult boundary =
+                    new WallGenerationSystem().Generate(participatingCoordinates);
+                ModularBoardVisualPlan plan =
+                    new ModularBoardVisualPlanner().CreatePlan(boundary);
+                Transform root = EnsureBoardVisualSpawnRoot();
+
+                return new ModularBoardVisualBuilder().TryRebuild(
+                    plan,
+                    boardCellVisualPrefab,
+                    root,
+                    worldLayout,
+                    boardVisualNormalOffset,
+                    out _,
+                    out failureReason);
+            }
+            catch (Exception exception)
+            {
+                failureReason =
+                    $"Drop The Man board visual construction failed: {exception.Message}";
+                return false;
+            }
+        }
+
+        private Transform EnsureBoardVisualSpawnRoot()
+        {
+            if (boardVisualSpawnRoot != null)
+            {
+                return boardVisualSpawnRoot;
+            }
+
+            Transform existing = transform.Find("GeneratedBoardVisuals");
+            if (existing != null)
+            {
+                boardVisualSpawnRoot = existing;
+                return boardVisualSpawnRoot;
+            }
+
+            GameObject rootObject = new("GeneratedBoardVisuals");
+            rootObject.transform.SetParent(transform, false);
+            boardVisualSpawnRoot = rootObject.transform;
+            return boardVisualSpawnRoot;
         }
 
         private bool TrySpawnRuntimeViews(

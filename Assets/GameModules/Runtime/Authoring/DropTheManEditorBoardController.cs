@@ -481,6 +481,12 @@ namespace DropAwayPrototype.Editor
 
         private void RebuildBoardVisuals(GridWorldLayout worldLayout)
         {
+            if (config != null && config.editorCellPrefab != null)
+            {
+                RebuildModularBoardVisuals(worldLayout);
+                return;
+            }
+
             DestroyChildren(boardVisualRoot);
 
             Quaternion boardRotation = BuildBoardRotation(worldLayout);
@@ -511,14 +517,44 @@ namespace DropAwayPrototype.Editor
 
         private GameObject CreateCellVisualObject()
         {
-            if (config != null && config.editorCellPrefab != null)
-            {
-                GameObject instance = Instantiate(config.editorCellPrefab);
-                instance.name = config.editorCellPrefab.name;
-                return instance;
-            }
-
             return new GameObject("EditorCell");
+        }
+
+        private void RebuildModularBoardVisuals(GridWorldLayout worldLayout)
+        {
+            try
+            {
+                List<GridCoordinate> participatingCoordinates =
+                    DropTheManBoardVisualParticipationMapper.CreateFromEditorData(
+                        levelData.BoardWidth,
+                        levelData.BoardHeight,
+                        levelData.BlockedCells);
+                WallGenerationResult boundary =
+                    new WallGenerationSystem().Generate(participatingCoordinates);
+                ModularBoardVisualPlan plan =
+                    new ModularBoardVisualPlanner().CreatePlan(boundary);
+                ModularBoardVisualBuilder builder = new();
+
+                if (!builder.TryRebuild(
+                        plan,
+                        config.editorCellPrefab,
+                        boardVisualRoot,
+                        worldLayout,
+                        0f,
+                        out _,
+                        out string failureReason))
+                {
+                    Debug.LogWarning(
+                        $"Drop The Man editor board visual rebuild failed: {failureReason}",
+                        this);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    $"Drop The Man editor board visual rebuild failed: {exception.Message}",
+                    this);
+            }
         }
 
         private void RebuildPlacementVisuals(GridWorldLayout worldLayout)

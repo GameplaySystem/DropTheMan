@@ -638,6 +638,9 @@ MonoBehaviour:
   boardGridYAxis: {x: 0, y: 0, z: 1}
   spawnRuntimeViews: 1
   runtimeViewSpawnRoot: {fileID: 0}
+  boardCellVisualPrefab: {fileID: 135422902841736654, guid: 5c84238caef74744b89f15e81b4efd80, type: 3}
+  boardVisualSpawnRoot: {fileID: 0}
+  boardVisualNormalOffset: 0
   levelData:
     LevelId: drop_the_man_dev_minimal
     DisplayName: Drop The Man Dev Minimal

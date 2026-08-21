@@ -16,7 +16,7 @@ namespace DropAwayPrototype.Editor
     {
         [Min(1)] public int defaultBoardWidth = 5;
         [Min(1)] public int defaultBoardHeight = 5;
-        public GameObject editorCellPrefab;
+        public ModularBoardCellView editorCellPrefab;
         public GameObject stickmanPreviewPrefab;
         public Material blockedCellMaterial;
         public List<Material> colorSlotMaterials = new();

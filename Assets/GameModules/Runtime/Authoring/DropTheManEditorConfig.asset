@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Editor.DropTheManEditorConfig
   defaultBoardWidth: 7
   defaultBoardHeight: 8
-  editorCellPrefab: {fileID: 0}
+  editorCellPrefab: {fileID: 135422902841736654, guid: 5c84238caef74744b89f15e81b4efd80, type: 3}
   stickmanPreviewPrefab: {fileID: 0}
   blockedCellMaterial: {fileID: 0}
   colorSlotMaterials: []
