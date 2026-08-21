@@ -219,6 +219,11 @@ For MVP, the bootstrapper may receive explicit serialized references or construc
 
 For the first Drop The Man playable scene, the runtime `GridWorldLayout` should be configured for an XZ board:
 
+The gameplay bootstrapper derives cell `(0,0)` from a configured world-space board center and the
+loaded logical board dimensions. The same centered layout must be supplied to generated board
+visuals, runtime views, drag, snap, collection-distance conversion, and input integration. Do not
+offset only the visual root.
+
 ```text
 GridCoordinate.X -> world.x
 GridCoordinate.Y -> world.z

@@ -709,7 +709,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: 8cac185436c3e9c4c88e045655d231a5, type: 3}
   - {fileID: 4900000, guid: 1a72361f77cd1364882973e9a46e7626, type: 3}
   startingLevelIndex: 0
-  boardWorldOrigin: {x: 0, y: 0, z: 0}
+  boardWorldCenter: {x: 0, y: 0, z: 0}
   cellSize: {x: 1, y: 1}
   boardGridXAxis: {x: 1, y: 0, z: 0}
   boardGridYAxis: {x: 0, y: 0, z: 1}

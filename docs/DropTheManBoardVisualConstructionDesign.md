@@ -38,6 +38,8 @@ The supplied art set is expected to contain:
 
 * the board plane remains Unity XZ
 * authored grid coordinates remain cell centers
+* gameplay construction centers the logical rectangular board bounds on the configured world
+  center; blocked or visually absent cells do not change that center
 * Drop The Man blocked coordinates represent visually absent board cells
 * no cell base, wall children, or other board geometry is rendered at a blocked coordinate
 * walls are rendered on participating cells adjacent to absent space

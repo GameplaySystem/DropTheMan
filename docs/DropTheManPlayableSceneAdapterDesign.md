@@ -355,16 +355,25 @@ Scene input should therefore use a horizontal board plane with normal:
 The `GridWorldLayout` provided to runtime code should use:
 
 ```text
-BoardOrigin = board plane origin
+BoardCenter = configured board center
+BoardOrigin = BoardCenter
+    - BoardXAxis * ((BoardWidth - 1) * CellSize.x / 2)
+    - BoardYAxis * ((BoardHeight - 1) * CellSize.y / 2)
 CellSize = configured board cell size
 BoardXAxis = (1, 0, 0)
 BoardYAxis = (0, 0, 1)
 ```
 
+`BoardOrigin` remains the world-space center of cell `(0,0)`. Centering changes only how that
+origin is derived. It does not change authored JSON coordinates or runtime grid coordinates.
+
+The center uses the logical rectangular board dimensions, not the centroid of participating cells.
+Blocked cells and internal holes must not shift the complete level at runtime.
+
 The scene adapter should serialize or otherwise explicitly receive:
 
 * camera reference
-* board plane origin
+* board center
 * board plane normal
 * optional drag depth offset
 

@@ -4,6 +4,7 @@ using PuzzleFramework.Presentation;
 using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
+using UnityEngine.Serialization;
 using System.Collections.Generic;
 using System;
 
@@ -27,7 +28,8 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private TextAsset jsonLevelAsset;
         [SerializeField] private TextAsset[] levelSequence = Array.Empty<TextAsset>();
         [SerializeField, Min(0)] private int startingLevelIndex;
-        [SerializeField] private Vector3 boardWorldOrigin = Vector3.zero;
+        [FormerlySerializedAs("boardWorldOrigin")]
+        [SerializeField] private Vector3 boardWorldCenter = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
         [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
         [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
@@ -282,8 +284,10 @@ namespace DropAwayPrototype.Runtime
             GridWorldLayout worldLayout;
             try
             {
-                worldLayout = new GridWorldLayout(
-                    boardWorldOrigin,
+                worldLayout = GridWorldLayout.CreateCentered(
+                    boardWorldCenter,
+                    frameworkBuildResult.Context.BoardData.Width,
+                    frameworkBuildResult.Context.BoardData.Height,
                     cellSize,
                     boardGridXAxis,
                     boardGridYAxis);
