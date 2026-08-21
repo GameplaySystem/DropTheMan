@@ -310,7 +310,7 @@ A hole view should be a thin scene adapter for:
 * current visual transform
 * applying authoritative world position
 * enabling or disabling selectable presentation
-* optional lifecycle presentation hooks later
+* starting the optional full-hole completion presentation and reporting one callback
 
 A hole view should not:
 
@@ -363,11 +363,19 @@ drag-session owner converts the reserved slot into fill
 Full-hole completion:
 
 ```text
-DropTheManFullHoleCompletionResult.HoleCompleted
+DropTheManFullHoleCompletionResult.PresentationPending
     ->
-registry marks the hole view non-selectable
+registry disables hole interaction but keeps its renderers visible
     ->
-later presentation may hide or animate the completed hole
+integration optionally snaps the live view to the nearest valid footprint-origin cell without committing it
+    ->
+view plays cap-close and shrink, or invokes an immediate fallback callback
+    ->
+runtime finalizes Completed
+    ->
+registry destroys or hides the completed view
+    ->
+outcome router consumes the completed-hole fact
 ```
 
 The view registry should treat missing views as setup errors for the first playable scene, not gameplay fallback behavior.
@@ -442,7 +450,9 @@ start collection presentation for newly collecting stickmen
     ->
 report synchronous placeholder completion to the drag-session owner
     ->
-if full-hole completion result reports a completed hole, route it to outcome router
+if the hole becomes Full, cancel drag and begin the registered completion presentation
+    ->
+on callback, finalize Completed, clean up the view, and route the completed-hole fact
 ```
 
 The adapter must not call `DropTheManMovementCoordinator` directly.
@@ -535,11 +545,20 @@ after the triggered placeholder presentation returns and capacity fill makes the
 This still happens in the controller call handling the accepted drag input sample; release remains
 outside the collection and full-hole path.
 
-The completion call returns:
+The begin call returns:
 
 ```text
-DropTheManFullHoleCompletionResult
+DropTheManFullHoleCompletionResult with PresentationPending
 ```
+
+The direct view callback invokes the completion service's finalize operation. Only the finalized
+result may be passed to the outcome router. Missing or invalid view presentation invokes the same
+callback immediately so placeholder scenes retain deterministic completion.
+
+Before requesting presentation, a scene-level option may make integration evaluate the live view
+through the framework grid snap query and apply only its world position. When disabled, the view
+keeps its final freeform drag position. Neither policy may reuse the non-full release commit, change
+`CurrentCoordinate`, or occupy the footprint again.
 
 The integration layer routes successful completed-hole facts to:
 
@@ -736,6 +755,10 @@ This design does not include:
 * optional required-hole schema
 * framework event-system use
 * framework runtime or package changes
+
+Concrete hole completion presentation is specified separately in
+`DropTheManHolePresentationDesign.md`. The corrected single-hole prefab passed isolated validation,
+so the direct callback handshake is approved without changing framework ownership.
 
 ---
 

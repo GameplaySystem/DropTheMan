@@ -1,5 +1,6 @@
-using UnityEngine;
+using System;
 using PuzzleFramework.Presentation;
+using UnityEngine;
 
 namespace DropAwayPrototype.Runtime
 {
@@ -19,10 +20,12 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Renderer[] renderersToHideWhenNotSelectable;
         [SerializeField] private bool destroySpawnedViewOnCompleted = true;
         [SerializeField, Min(0.01f)] private float spawnedViewScaleMultiplier = 0.88f;
+        [SerializeField] private DropTheManHolePresentation completionPresentation;
 
         private bool _templateHidden;
         private bool _isSpawnedClone;
         private bool _hasCapturedTemplateScale;
+        private bool _completionPresentationStarted;
         private Vector3 _templateLocalScale;
 
         public string RuntimeId => runtimeId;
@@ -43,7 +46,55 @@ namespace DropAwayPrototype.Runtime
                 renderersToHideWhenNotSelectable = GetComponentsInChildren<Renderer>(includeInactive: true);
             }
 
+            if (completionPresentation == null)
+            {
+                TryGetComponent(out completionPresentation);
+            }
+
             ApplySelectableState();
+        }
+
+        /// <summary>
+        /// Disables interaction, then starts the optional concrete completion presentation.
+        /// Missing or invalid presentation invokes the callback immediately so visuals cannot
+        /// block gameplay completion.
+        /// </summary>
+        public bool TryPlayCompletionPresentation(
+            Action completionCallback,
+            out string failureReason)
+        {
+            if (_completionPresentationStarted)
+            {
+                failureReason =
+                    $"Hole view '{runtimeId}' already started completion presentation.";
+                return false;
+            }
+
+            _completionPresentationStarted = true;
+            isSelectable = false;
+            ApplyInteractionState();
+
+            if (completionPresentation == null)
+            {
+                completionCallback?.Invoke();
+                failureReason = string.Empty;
+                return true;
+            }
+
+            if (completionPresentation.TryPlayCompletion(
+                    completionCallback,
+                    out string presentationFailureReason))
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            Debug.LogWarning(
+                $"Hole view '{runtimeId}' is using immediate completion fallback: {presentationFailureReason}",
+                this);
+            completionCallback?.Invoke();
+            failureReason = string.Empty;
+            return true;
         }
 
         public void ApplyWorldPosition(Vector3 worldPosition)
@@ -77,6 +128,7 @@ namespace DropAwayPrototype.Runtime
             runtimeId = newRuntimeId;
             _templateHidden = false;
             _isSpawnedClone = true;
+            _completionPresentationStarted = false;
             ApplyWorldPosition(worldPosition);
             ApplySpawnedScale();
             isSelectable = true;
@@ -95,10 +147,7 @@ namespace DropAwayPrototype.Runtime
 
         private void ApplySelectableState()
         {
-            if (selectionCollider != null)
-            {
-                selectionCollider.enabled = !_templateHidden && isSelectable;
-            }
+            ApplyInteractionState();
 
             if (!hideRenderersWhenNotSelectable || renderersToHideWhenNotSelectable == null)
             {
@@ -112,6 +161,14 @@ namespace DropAwayPrototype.Runtime
                     renderersToHideWhenNotSelectable[i].enabled =
                         !_templateHidden && isSelectable;
                 }
+            }
+        }
+
+        private void ApplyInteractionState()
+        {
+            if (selectionCollider != null)
+            {
+                selectionCollider.enabled = !_templateHidden && isSelectable;
             }
         }
 
@@ -129,6 +186,11 @@ namespace DropAwayPrototype.Runtime
             {
                 renderersToHideWhenNotSelectable =
                     GetComponentsInChildren<Renderer>(includeInactive: true);
+            }
+
+            if (completionPresentation == null)
+            {
+                TryGetComponent(out completionPresentation);
             }
         }
 

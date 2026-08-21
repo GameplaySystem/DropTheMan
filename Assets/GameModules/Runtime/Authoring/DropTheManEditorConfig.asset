@@ -22,7 +22,6 @@ MonoBehaviour:
   - id: hole_single
     displayName: Single Cell
     defaultColorIdentity: 1
-    previewPrefab: {fileID: 0}
+    previewPrefab: {fileID: 4392594651091996551, guid: b35cae307b38d25408a3b3626d6bfb16, type: 3}
     footprintOffsets:
-    - x: 0
-      y: 0
+    - {x: 0, y: 0}

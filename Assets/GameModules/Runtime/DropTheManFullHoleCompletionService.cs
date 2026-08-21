@@ -14,6 +14,7 @@ namespace DropAwayPrototype.Runtime
         private DropTheManFullHoleCompletionResult(
             bool wasEvaluated,
             bool success,
+            bool presentationPending,
             bool holeCompleted,
             bool shouldNotifyHoleCompleted,
             HoleRuntimeState hole,
@@ -21,6 +22,7 @@ namespace DropAwayPrototype.Runtime
         {
             WasEvaluated = wasEvaluated;
             Success = success;
+            PresentationPending = presentationPending;
             HoleCompleted = holeCompleted;
             ShouldNotifyHoleCompleted = shouldNotifyHoleCompleted;
             Hole = hole;
@@ -37,6 +39,12 @@ namespace DropAwayPrototype.Runtime
         /// True when the evaluated completion flow finished without integrity failure.
         /// </summary>
         public bool Success { get; }
+
+        /// <summary>
+        /// True after structural completion began and the hole entered Closing, but before the
+        /// presentation callback finalized Completed.
+        /// </summary>
+        public bool PresentationPending { get; }
 
         /// <summary>
         /// True when the hole finished the MVP completion flow and is now Completed.
@@ -69,7 +77,21 @@ namespace DropAwayPrototype.Runtime
                 false,
                 false,
                 false,
+                false,
                 null,
+                string.Empty);
+        }
+
+        public static DropTheManFullHoleCompletionResult AwaitingPresentation(
+            HoleRuntimeState hole)
+        {
+            return new DropTheManFullHoleCompletionResult(
+                true,
+                true,
+                true,
+                false,
+                false,
+                hole ?? throw new ArgumentNullException(nameof(hole)),
                 string.Empty);
         }
 
@@ -78,6 +100,7 @@ namespace DropAwayPrototype.Runtime
             return new DropTheManFullHoleCompletionResult(
                 true,
                 true,
+                false,
                 true,
                 true,
                 hole ?? throw new ArgumentNullException(nameof(hole)),
@@ -93,6 +116,7 @@ namespace DropAwayPrototype.Runtime
                 false,
                 false,
                 false,
+                false,
                 hole,
                 failureReason);
         }
@@ -100,20 +124,20 @@ namespace DropAwayPrototype.Runtime
 
     /// <summary>
     /// Prototype-owned completion owner for holes that already reached Full during drag.
-    /// This releases the stale committed occupancy footprint, transitions Full to Closing to
-    /// Completed synchronously for MVP, and exposes a narrow hole-completed result for future
-    /// outcome routing.
+    /// This releases the stale committed occupancy footprint and transitions Full to Closing.
+    /// A later direct presentation callback finalizes Closing to Completed and exposes the narrow
+    /// hole-completed result consumed by outcome routing.
     /// This service must not request win/loss, run timer arbitration, or perform presentation work.
     /// </summary>
     public sealed class DropTheManFullHoleCompletionService
     {
         /// <summary>
-        /// Completes a hole that already became Full during drag-time collection.
+        /// Begins completion for a hole that already became Full during drag-time collection.
         /// The hole must still be part of the provided runtime model and must currently be in the
         /// Full state. Active, Closing, and Completed holes are rejected.
         /// If releasing stale committed occupancy fails, the hole remains Full and completion fails.
         /// </summary>
-        public DropTheManFullHoleCompletionResult CompleteFullHole(
+        public DropTheManFullHoleCompletionResult BeginFullHoleCompletion(
             DropTheManRuntimeModel runtimeModel,
             HoleRuntimeState hole)
         {
@@ -168,6 +192,45 @@ namespace DropAwayPrototype.Runtime
             }
 
             hole.BeginClosing();
+            return DropTheManFullHoleCompletionResult.AwaitingPresentation(hole);
+        }
+
+        /// <summary>
+        /// Finalizes a closing hole after its presentation callback or immediate fallback.
+        /// Structural occupancy was already released by <see cref="BeginFullHoleCompletion"/>.
+        /// </summary>
+        public DropTheManFullHoleCompletionResult FinalizeFullHoleCompletion(
+            DropTheManRuntimeModel runtimeModel,
+            HoleRuntimeState hole)
+        {
+            if (runtimeModel == null)
+            {
+                return DropTheManFullHoleCompletionResult.Failed(
+                    null,
+                    "Runtime model is required.");
+            }
+
+            if (hole == null)
+            {
+                return DropTheManFullHoleCompletionResult.Failed(
+                    null,
+                    "Hole runtime state is required.");
+            }
+
+            if (!ContainsHoleReference(runtimeModel.Holes, hole))
+            {
+                return DropTheManFullHoleCompletionResult.Failed(
+                    hole,
+                    $"Hole '{hole.Id}' is not part of the provided runtime model.");
+            }
+
+            if (hole.LifecycleState != HoleLifecycleState.Closing)
+            {
+                return DropTheManFullHoleCompletionResult.Failed(
+                    hole,
+                    $"Hole '{hole.Id}' cannot finalize completion in state {hole.LifecycleState}.");
+            }
+
             hole.MarkCompleted();
             return DropTheManFullHoleCompletionResult.Completed(hole);
         }

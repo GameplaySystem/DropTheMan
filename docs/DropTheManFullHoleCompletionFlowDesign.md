@@ -225,7 +225,7 @@ Reason:
 * accepting a `Full` hole into completion flow
 * releasing the hole's old committed structural occupancy
 * transitioning `Full -> Closing`
-* transitioning `Closing -> Completed` for MVP
+* finalizing `Closing -> Completed` only after the direct presentation callback or fallback
 * preventing duplicate completion notification
 * returning a direct completion result for later outcome routing
 
@@ -260,23 +260,17 @@ When the hole becomes `Full`, these gameplay changes should happen immediately:
 * the hole enters completion flow
 * the runtime can expose a `hole completed` fact once MVP completion finalizes
 
-### Deferred presentation concerns
+### Presentation boundary
 
-These should remain deferred until later presentation work exists:
-
-* settling the visual hole to a preferred close position
-* cap-close animation timing
-* visual disappearance timing
-* visual cleanup callbacks
+The concrete hole view may now delay `Closing -> Completed` while its cap-close and shrink sequence
+plays. The delay is bounded by one direct callback owned by the configured view component.
 
 Important policy:
 
-* gameplay completion must not wait on presentation in the MVP foundation
-
-Reason:
-
-* there is no approved presentation completion owner yet
-* gameplay should not remain blocked by absent animation infrastructure
+* the runtime enters `Closing` and releases stale occupancy before presentation starts
+* the view cannot mutate lifecycle state or route outcomes
+* missing or invalid presentation invokes the completion callback immediately
+* gameplay therefore never deadlocks because a visual component is absent
 
 ---
 
@@ -294,7 +288,7 @@ Closing
 Completed
 ```
 
-Recommended MVP sequencing:
+Approved sequencing:
 
 1. Movement coordinator reserves a valid target and later triggers it at the configured threshold.
 2. The collection presentation completes and its reserved capacity slot becomes filled.
@@ -302,22 +296,25 @@ Recommended MVP sequencing:
 4. Drag-session owner calls the full-hole completion service immediately.
 5. Completion service releases the old committed occupancy footprint.
 6. Completion service calls `BeginClosing()`.
-7. MVP completion service immediately calls `MarkCompleted()`.
-8. Completion result reports that the hole completed now.
-
-This keeps the explicit `Closing` state in the sequence without requiring an asynchronous callback path yet.
+7. Integration disables drag interaction and, when the scene option is enabled, aligns the visual root to the nearest framework-valid footprint-origin cell.
+8. Integration asks the registered hole view to play completion.
+9. The configured presentation invokes one callback after cap-close and shrink; a missing or invalid presentation invokes it immediately.
+10. Completion service validates `Closing` and calls `MarkCompleted()`.
+11. Integration destroys or hides the completed view and routes the completed-hole fact.
 
 ### Why `CurrentCoordinate` should not move here
 
 Full holes are leaving active board participation.
 
-They are not establishing a new committed snapped placement.
+They are not establishing a new committed snapped placement. The required closing alignment is a
+visual-only settle query against the current live view position.
 
 Therefore:
 
 * do not route full holes through the normal non-full release commit path
 * do not invent a new committed board origin for a hole that is about to complete and leave play
 * keep `CurrentCoordinate` as the last committed origin history value
+* apply the valid snapped world position to the view only
 
 ---
 
@@ -459,36 +456,27 @@ After full-hole completion was already accepted:
 
 ### Visual position handoff
 
-The completion flow should preserve the last authoritative world position from the full-ending drag update in its result.
+The scene-level `snapFullHolesToNearestCellBeforeClosing` option selects the visual policy. When it
+is enabled, the integration layer evaluates the live hole-view position through the framework
+`GridSnapSystem` with the complete footprint before cap closing starts. A valid nearest origin
+becomes the closing world position. If the nearest candidate is invalid, the snap result's previous
+committed-origin fallback is used. When the option is disabled, presentation starts from the final
+freeform drag position.
 
-Reason:
+Either visual policy must not:
 
-* future presentation may want to settle or close from that location
-* gameplay still should not convert that world position into a new committed board coordinate
+* call the non-full release-commit service
+* occupy the snapped footprint again
+* mutate `HoleRuntimeState.CurrentCoordinate`
+* trigger collection or outcome routing
 
 ---
 
 ## Synchronous vs Callback-Based Sequencing
 
-### Chosen MVP policy
+### Chosen policy
 
-Use synchronous direct-call completion for the MVP foundation.
-
-Policy:
-
-* the completion service performs `Full -> Closing -> Completed` in one gameplay call
-* it returns an explicit result
-* future outcome routing consumes that result directly
-
-### Why this is the right MVP choice
-
-* no approved presentation callback owner exists yet
-* only one immediate consumer is known
-* a direct result is simpler than event fan-out
-
-### Deferred future extension
-
-When presentation later exists, the same owner can be split into:
+Use a direct callback split around the prototype-owned hole presentation:
 
 ```text
 BeginCompletion
@@ -498,9 +486,9 @@ presentation callback
 FinalizeCompletion
 ```
 
-That later split does not require a new framework system.
-
-It is only a refinement of the same prototype-owned ownership.
+This does not require a framework system, event bus, or service locator. It is a refinement of the
+same prototype-owned completion owner. Immediate fallback keeps placeholder behavior synchronous
+without making the primary configured path synchronous.
 
 ---
 
@@ -535,20 +523,22 @@ Do not introduce:
 
 ## Recommended First Implementation Slice
 
-After this design is approved, the next smallest implementation slice should:
+The current implementation:
 
-* add `DropTheManFullHoleCompletionService`
-* release stale committed occupancy for a full hole
-* transition `Full -> Closing -> Completed`
-* return an explicit completion result
-* call the service from the full-ending path of `DropTheManDragSessionOwner.UpdateDrag(...)`
-* keep `Release()` cleanup-only after a full-ended session
+* splits `DropTheManFullHoleCompletionService` into begin and finalize operations
+* keeps stale occupancy release and `Full -> Closing` in the begin operation
+* starts the registered hole-view presentation after drag cancellation
+* finalizes `Closing -> Completed` from one direct callback
+* destroys or hides the view and routes outcomes only after finalization
+* retains immediate fallback for placeholder or invalid presentation
+
+This callback path passed integrated Unity playtest with the corrected single-hole prefab. The
+visual-only nearest-cell alignment added before presentation still requires manual validation.
 
 Do not add in that same step:
 
 * win or loss requests
 * timer arbitration
-* presentation animation orchestration
 * framework event-system generalization
 * scene wiring
 
@@ -558,10 +548,9 @@ Do not add in that same step:
 
 These remain intentionally deferred even with the design in place:
 
-* exact presentation callback timing for cap-close visuals
-* whether completed-hole visuals linger briefly while gameplay already treats them as gone
-* final win predicate integration and terminal guard wiring
-* reset or restart cleanup while a future asynchronous closing path is active
+* reset or restart cleanup while an asynchronous closing path is active
+* timer expiry racing with a closing presentation
+* future cat-to-socket collection animation before capacity fill
 
 Those are real follow-up decisions, but they should not block the narrow completion-flow foundation.
 
@@ -574,7 +563,8 @@ Use a prototype-owned full-hole completion service.
 Start completion immediately on the drag update that makes the hole Full.
 Do not wait for pointer release.
 Release stale committed occupancy as part of full-hole completion ownership.
-Transition Full -> Closing -> Completed synchronously for MVP.
-Expose a direct completion result for later outcome routing.
-Keep win/loss, timer arbitration, and presentation sequencing out of this slice.
+Transition Full -> Closing before presentation.
+Finalize Closing -> Completed from one direct callback or immediate fallback.
+Route outcomes only after completion finalizes.
+Keep this prototype-owned; do not add a framework event bus or presentation authority.
 ```

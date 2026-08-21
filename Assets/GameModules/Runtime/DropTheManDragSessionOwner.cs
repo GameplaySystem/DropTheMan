@@ -495,7 +495,7 @@ namespace DropAwayPrototype.Runtime
             _isSessionActive = false;
             _sessionEndedBecauseHoleBecameFull = true;
             DropTheManFullHoleCompletionResult completionResult =
-                _fullHoleCompletionService.CompleteFullHole(_runtimeModel, _activeHole);
+                _fullHoleCompletionService.BeginFullHoleCompletion(_runtimeModel, _activeHole);
 
             return completionResult.Success
                 ? DropTheManCollectionPresentationCompletionResult.Completed(
@@ -507,6 +507,20 @@ namespace DropAwayPrototype.Runtime
                     _activeHole,
                     stickman,
                     completionResult);
+        }
+
+        /// <summary>
+        /// Finalizes a hole after its direct completion-presentation callback. This operation is
+        /// independent of active drag-session context because the drag is cleared before the
+        /// closing presentation starts.
+        /// </summary>
+        public DropTheManFullHoleCompletionResult FinalizeFullHoleCompletion(
+            DropTheManRuntimeModel runtimeModel,
+            HoleRuntimeState hole)
+        {
+            return _fullHoleCompletionService.FinalizeFullHoleCompletion(
+                runtimeModel,
+                hole);
         }
 
         /// <summary>

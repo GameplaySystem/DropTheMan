@@ -72,7 +72,8 @@ namespace DropAwayPrototype.Runtime
             IEnumerable<IDropTheManStickmanView> stickmanViews,
             TimerSystem timerSystem = null,
             float collectionTriggerRadiusInCells = 0.35f,
-            float dragClearanceInsetCells = 0.08f)
+            float dragClearanceInsetCells = 0.08f,
+            bool snapFullHolesToNearestCellBeforeClosing = true)
         {
             if (runtimeModel == null)
             {
@@ -121,7 +122,8 @@ namespace DropAwayPrototype.Runtime
                 new DropTheManOutcomeRouter(),
                 timerSystem,
                 collectionTriggerRadiusInCells,
-                dragClearanceInsetCells);
+                dragClearanceInsetCells,
+                snapFullHolesToNearestCellBeforeClosing);
 
             return DropTheManRuntimeBootstrapResult.Successful(
                 controller,

@@ -21,6 +21,7 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private bool tickTimerInUpdate = true;
         [SerializeField, Min(0.01f)] private float collectionTriggerRadiusInCells = 0.35f;
         [SerializeField, Range(0f, 0.45f)] private float dragClearanceInsetCells = 0.08f;
+        [SerializeField] private bool snapFullHolesToNearestCellBeforeClosing = true;
 
         private DropTheManRuntimeController _runtimeController;
         private DropTheManHoleView[] _runtimeHoleViews;
@@ -98,7 +99,8 @@ namespace DropAwayPrototype.Runtime
                     _runtimeStickmanViews,
                     timerSystem,
                     collectionTriggerRadiusInCells,
-                    dragClearanceInsetCells);
+                    dragClearanceInsetCells,
+                    snapFullHolesToNearestCellBeforeClosing);
 
             if (!bootstrapResult.Success)
             {

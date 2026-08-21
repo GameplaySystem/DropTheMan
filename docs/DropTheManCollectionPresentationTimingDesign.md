@@ -576,3 +576,9 @@ if full, full-hole completion begins
 ```
 
 This preserves drag-time collection ownership while matching the intended visual sequence.
+
+The concrete hole visual contract and direct presentation callback are defined in
+`DropTheManHolePresentationDesign.md`. Stickman collection presentation remains synchronous for
+now, but a full hole now enters `Closing` before its configured hole presentation and finalizes
+`Completed` only from the presentation callback. Missing or invalid hole presentation uses the
+same callback immediately.

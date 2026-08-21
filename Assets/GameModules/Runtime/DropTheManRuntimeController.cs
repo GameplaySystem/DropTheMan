@@ -1,5 +1,6 @@
 using System;
 using PuzzleFramework.CoreBoard;
+using PuzzleFramework.Interaction;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
 
@@ -210,10 +211,12 @@ namespace DropAwayPrototype.Runtime
         private readonly DropTheManViewRegistry _viewRegistry;
         private readonly DropTheManDragSessionOwner _dragSessionOwner;
         private readonly DropTheManOutcomeRouter _outcomeRouter;
+        private readonly IGridSnapSystem _fullHoleVisualSnapSystem;
         private readonly GameStateSystem _gameStateSystem;
         private readonly TimerSystem _timerSystem;
         private readonly float _collectionTriggerRadiusInCells;
         private readonly float _dragClearanceInsetCells;
+        private readonly bool _snapFullHolesToNearestCellBeforeClosing;
 
         private string _activeHoleId = string.Empty;
         private bool _terminalOutcomeAccepted;
@@ -227,7 +230,9 @@ namespace DropAwayPrototype.Runtime
             DropTheManOutcomeRouter outcomeRouter = null,
             TimerSystem timerSystem = null,
             float collectionTriggerRadiusInCells = 0.35f,
-            float dragClearanceInsetCells = 0.08f)
+            float dragClearanceInsetCells = 0.08f,
+            bool snapFullHolesToNearestCellBeforeClosing = true,
+            IGridSnapSystem fullHoleVisualSnapSystem = null)
         {
             if (collectionTriggerRadiusInCells <= 0f)
             {
@@ -249,9 +254,12 @@ namespace DropAwayPrototype.Runtime
             _gameStateSystem = gameStateSystem ?? throw new ArgumentNullException(nameof(gameStateSystem));
             _dragSessionOwner = dragSessionOwner ?? new DropTheManDragSessionOwner();
             _outcomeRouter = outcomeRouter ?? new DropTheManOutcomeRouter();
+            _fullHoleVisualSnapSystem = fullHoleVisualSnapSystem ?? new GridSnapSystem();
             _timerSystem = timerSystem;
             _collectionTriggerRadiusInCells = collectionTriggerRadiusInCells;
             _dragClearanceInsetCells = dragClearanceInsetCells;
+            _snapFullHolesToNearestCellBeforeClosing =
+                snapFullHolesToNearestCellBeforeClosing;
         }
 
         public bool HasActiveDrag => _dragSessionOwner.HasSessionContext;
@@ -404,43 +412,22 @@ namespace DropAwayPrototype.Runtime
             bool outcomeWasHandled = false;
 
             if (fullHoleCompletionResult.Success &&
-                fullHoleCompletionResult.HoleCompleted &&
-                fullHoleCompletionResult.ShouldNotifyHoleCompleted)
+                fullHoleCompletionResult.PresentationPending)
             {
-                string completedHoleId = fullHoleCompletionResult.HoleId;
-                bool completedHoleWasActiveDrag =
-                    string.Equals(_activeHoleId, completedHoleId, StringComparison.Ordinal);
-
-                if (completedHoleWasActiveDrag)
-                {
-                    CancelActiveDragWithoutReleaseCommit();
-                }
-
-                DropTheManViewRegistryResult selectableResult =
-                    _viewRegistry.SetHoleSelectable(
-                        completedHoleId,
-                        false);
-                if (!selectableResult.Success)
+                if (!TryBeginFullHoleCompletionPresentation(
+                        fullHoleCompletionResult,
+                        out outcomeResult,
+                        out outcomeWasHandled,
+                        out terminalAccepted,
+                        out string presentationFailureReason))
                 {
                     CancelActiveDragWithoutReleaseCommit();
                     return DropTheManRuntimeControllerResult.UpdatedDrag(
                         false,
                         updateResult.AuthoritativeWorldPosition,
-                        false,
-                        default,
-                        selectableResult.FailureReason);
-                }
-
-                outcomeResult = _outcomeRouter.HandleHoleCompleted(
-                    _runtimeModel,
-                    fullHoleCompletionResult,
-                    _gameStateSystem);
-                outcomeWasHandled = true;
-
-                terminalAccepted = outcomeResult.OutcomeWasAccepted;
-                if (terminalAccepted)
-                {
-                    AcceptTerminalOutcomeAndStopInput();
+                        terminalAccepted,
+                        outcomeResult,
+                        presentationFailureReason);
                 }
             }
 
@@ -662,6 +649,165 @@ namespace DropAwayPrototype.Runtime
 
             failureReason = string.Empty;
             return true;
+        }
+
+        private bool TryBeginFullHoleCompletionPresentation(
+            DropTheManFullHoleCompletionResult beginResult,
+            out DropTheManOutcomeRoutingResult outcomeResult,
+            out bool outcomeWasHandled,
+            out bool terminalAccepted,
+            out string failureReason)
+        {
+            outcomeResult = default;
+            outcomeWasHandled = false;
+            terminalAccepted = false;
+            failureReason = string.Empty;
+
+            HoleRuntimeState hole = beginResult.Hole;
+            if (hole == null)
+            {
+                failureReason = "A closing hole is required to begin completion presentation.";
+                return false;
+            }
+
+            if (string.Equals(_activeHoleId, hole.Id, StringComparison.Ordinal))
+            {
+                CancelActiveDragWithoutReleaseCommit();
+            }
+
+            if (_snapFullHolesToNearestCellBeforeClosing)
+            {
+                AlignClosingHoleViewToNearestCell(hole);
+            }
+
+            DropTheManOutcomeRoutingResult callbackOutcomeResult = default;
+            bool callbackOutcomeWasHandled = false;
+            bool callbackTerminalAccepted = false;
+            string callbackFailureReason = string.Empty;
+            bool callbackInvoked = false;
+
+            void FinalizeFromPresentation()
+            {
+                if (callbackInvoked)
+                {
+                    return;
+                }
+
+                callbackInvoked = true;
+                if (!TryFinalizeFullHoleCompletion(
+                        hole,
+                        out callbackOutcomeResult,
+                        out callbackOutcomeWasHandled,
+                        out callbackTerminalAccepted,
+                        out callbackFailureReason))
+                {
+                    Debug.LogError(callbackFailureReason);
+                }
+            }
+
+            DropTheManViewRegistryResult presentationResult =
+                _viewRegistry.BeginHoleCompletionPresentation(
+                    hole.Id,
+                    FinalizeFromPresentation);
+            if (!presentationResult.Success)
+            {
+                Debug.LogWarning(
+                    $"Hole '{hole.Id}' is using immediate completion fallback: " +
+                    presentationResult.FailureReason);
+                FinalizeFromPresentation();
+            }
+
+            if (!callbackInvoked)
+            {
+                return true;
+            }
+
+            outcomeResult = callbackOutcomeResult;
+            outcomeWasHandled = callbackOutcomeWasHandled;
+            terminalAccepted = callbackTerminalAccepted;
+            failureReason = callbackFailureReason;
+            return string.IsNullOrEmpty(failureReason);
+        }
+
+        private void AlignClosingHoleViewToNearestCell(HoleRuntimeState hole)
+        {
+            if (!_viewRegistry.TryGetHoleView(hole.Id, out IDropTheManHoleView view) ||
+                view == null ||
+                (view is UnityEngine.Object unityObject && unityObject == null))
+            {
+                return;
+            }
+
+            GridSnapResult snapResult = _fullHoleVisualSnapSystem.Evaluate(
+                new GridSnapRequest(
+                    view.WorldPosition,
+                    hole.CurrentCoordinate,
+                    hole.Footprint.Offsets,
+                    _worldLayout,
+                    _runtimeModel.FrameworkContext.GridBoard,
+                    _runtimeModel.FrameworkContext.CellOccupancySystem));
+
+            if (!snapResult.IsValid)
+            {
+                Debug.LogWarning(
+                    $"Full hole '{hole.Id}' could not use its nearest closing cell and will " +
+                    $"align to its previous committed cell instead: {snapResult.FailureReason}");
+            }
+
+            DropTheManViewRegistryResult applyResult =
+                _viewRegistry.ApplyHoleWorldPosition(
+                    hole.Id,
+                    snapResult.SnappedWorldPosition);
+            if (!applyResult.Success)
+            {
+                Debug.LogWarning(
+                    $"Full hole '{hole.Id}' could not apply closing alignment: " +
+                    applyResult.FailureReason);
+            }
+        }
+
+        private bool TryFinalizeFullHoleCompletion(
+            HoleRuntimeState hole,
+            out DropTheManOutcomeRoutingResult outcomeResult,
+            out bool outcomeWasHandled,
+            out bool terminalAccepted,
+            out string failureReason)
+        {
+            outcomeResult = default;
+            outcomeWasHandled = false;
+            terminalAccepted = false;
+
+            DropTheManFullHoleCompletionResult completionResult =
+                _dragSessionOwner.FinalizeFullHoleCompletion(_runtimeModel, hole);
+            if (!completionResult.Success)
+            {
+                failureReason = completionResult.FailureReason;
+                return false;
+            }
+
+            DropTheManViewRegistryResult selectableResult =
+                _viewRegistry.SetHoleSelectable(hole.Id, false);
+            if (!selectableResult.Success)
+            {
+                failureReason = selectableResult.FailureReason;
+                return false;
+            }
+
+            outcomeResult = _outcomeRouter.HandleHoleCompleted(
+                _runtimeModel,
+                completionResult,
+                _gameStateSystem);
+            outcomeWasHandled = true;
+            terminalAccepted = outcomeResult.OutcomeWasAccepted;
+            if (terminalAccepted)
+            {
+                AcceptTerminalOutcomeAndStopInput();
+            }
+
+            failureReason = outcomeResult.Success
+                ? string.Empty
+                : outcomeResult.Reason;
+            return outcomeResult.Success;
         }
 
         private void AcceptTerminalOutcomeAndStopInput()

@@ -14,6 +14,9 @@ namespace DropAwayPrototype.Runtime
         Vector3 WorldPosition { get; }
         void ApplyWorldPosition(Vector3 worldPosition);
         void SetSelectable(bool isSelectable);
+        bool TryPlayCompletionPresentation(
+            Action completionCallback,
+            out string failureReason);
     }
 
     /// <summary>
@@ -196,6 +199,30 @@ namespace DropAwayPrototype.Runtime
 
             view.SetSelectable(isSelectable);
             return DropTheManViewRegistryResult.Successful();
+        }
+
+        public DropTheManViewRegistryResult BeginHoleCompletionPresentation(
+            string runtimeId,
+            Action completionCallback)
+        {
+            if (!TryGetHoleView(runtimeId, out IDropTheManHoleView view))
+            {
+                return DropTheManViewRegistryResult.Failed(
+                    $"No hole view is registered for runtime id '{runtimeId}'.");
+            }
+
+            if (view is UnityEngine.Object unityObject && unityObject == null)
+            {
+                _holeViews.Remove(runtimeId);
+                return DropTheManViewRegistryResult.Failed(
+                    $"Hole view '{runtimeId}' was destroyed before completion presentation could start.");
+            }
+
+            return view.TryPlayCompletionPresentation(
+                completionCallback,
+                out string failureReason)
+                ? DropTheManViewRegistryResult.Successful()
+                : DropTheManViewRegistryResult.Failed(failureReason);
         }
 
         public DropTheManViewRegistryResult NotifyCollectionStarted(
