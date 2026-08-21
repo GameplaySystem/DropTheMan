@@ -73,9 +73,42 @@ inner hole mesh
 The exact stencil compare operations, render queue, depth behavior, and mesh contract must be
 validated with the real hole assets before becoming an approved production setup.
 
+Concrete hole hierarchy, stencil-aperture, cap, root, and collection-socket requirements are
+defined in `DropTheManHolePresentationDesign.md`.
+
 Do not add a URP renderer feature merely because URP supports one. Prefer material/shader stencil
 state first; add a renderer feature only if ordering or pass control cannot be solved cleanly by
 the participating materials.
+
+### Material-Only Proof Of Concept
+
+The first approved experiment uses two prototype-owned test materials without layers or renderer
+features:
+
+* an invisible writer renders at queue `Geometry-1`, writes stencil reference `1`, writes no color
+  or depth, and uses `ZTest LEqual`
+* a Lit receiver renders at queue `Geometry`, uses URP's Lit input/forward implementation with the
+  stencil state declared directly on its ForwardLit pass, and rejects pixels where stencil
+  reference `1` is present
+* the writer and receiver expose matching stencil-reference properties so another value can be
+  tested without editing shader source
+
+The experiment assets live under:
+
+```text
+Assets/RuntimeAssets/Rendering/StencilTest/
+```
+
+The proof includes separate stencil-aware grid and cell materials that preserve the current
+artist-authored base colors and surface values. They replace the existing two material slots during
+testing; they are never appended as an extra pass. The originals remain unchanged.
+
+This is still not the final cell shader. The receiver currently defines only its ForwardLit pass
+and does not define dedicated shadow-caster, depth-only, depth-normals, meta, or motion-vector
+passes. Its purpose is to validate stencil availability, normal Lit appearance, ordering, camera
+behavior, and the future hole opening mesh contract before production shader-pass requirements are
+approved. An earlier `UsePass` experiment was rejected because its surrounding stencil state did
+not affect the imported URP pass reliably.
 
 ---
 
