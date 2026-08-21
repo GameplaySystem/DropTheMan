@@ -12,6 +12,10 @@ editor config and gameplay scene, and manually validated in Unity.
 This design does not change gameplay coordinates, JSON schema, occupancy, drag rules, or
 runtime board authority.
 
+Concrete Drop The Man board materials now use the prototype's URP baseline documented in
+`DropTheManRenderingPipelineDesign.md`. Wall topology, modular slot planning, and framework cell
+view contracts remain render-pipeline agnostic.
+
 ---
 
 ## Architecture Review
@@ -242,6 +246,7 @@ DropAwayPrototype owns:
 * concrete meshes, materials, dimensions, and art orientation
 * gameplay/editor scene adapters that request framework board construction
 * puzzle-specific gameplay meaning of absent space
+* concrete URP materials, shaders, and any future stencil-based board/hole presentation
 
 The reusable algorithm must be implemented in PuzzleFramework rather than copied into
 DropAwayPrototype.
