@@ -53,14 +53,18 @@ Phase 4A resolution:
   runtime-spawned views after JSON or dev-data loading succeeds
 * the spawned views then register through the existing scene-controller/runtime-controller path
 
-Phase 4B resolution:
+Phase 4B resolution and catalog follow-up:
 
-* the gameplay test scene may use a prototype-owned serialized `TextAsset[] levelSequence`
-  controlled by the dev bootstrapper rather than a production catalog
+* the gameplay test scene discovers JSON `TextAsset` levels from the configured Resources-relative
+  catalog path through the framework `LevelCatalogSystem`
+* Drop The Man owns JSON validation and conversion of canonical `Level N` ids into generic positive
+  sequence numbers; the framework does not interpret the puzzle schema
 * terminal `Won` and `Lost` acceptance may now surface through a temporary prototype-owned
   `OnGUI` result window with `Restart` and `Next Level`
 * restart and next-level flow should rebuild the level through the same runtime-spawn path rather
   than layering a second scene-loading or object-reset system
+* owner validation confirmed Resources discovery, same-level restart, and deterministic next-level
+  loading without serialized level references or Console errors
 
 ---
 
@@ -586,7 +590,7 @@ Recommended MVP scene startup:
 ```text
 scene has one hole template view and one stickman template view
     ->
-scene controller / dev bootstrapper receives dev-only level input or JSON TextAsset
+scene controller / dev bootstrapper discovers the configured Resources level catalog
     ->
 runtime model is built
     ->
@@ -611,7 +615,7 @@ observe controller.CurrentGameState after terminal acceptance
     ->
 show temporary Restart / Next controls
     ->
-call back into the dev bootstrapper to rebuild the selected JSON level
+call back into the dev bootstrapper to rebuild the selected catalog entry
 ```
 
 ---

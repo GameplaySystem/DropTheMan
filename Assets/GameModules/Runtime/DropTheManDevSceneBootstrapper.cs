@@ -12,7 +12,7 @@ namespace DropAwayPrototype.Runtime
 {
     /// <summary>
     /// Dev-only gameplay-scene bridge that builds a Drop The Man runtime model, initializes
-    /// the pre-wired scene controller, and can drive a prototype-only level sequence plus
+    /// the pre-wired scene controller, and can drive a Resources-backed level catalog plus
     /// temporary result HUD. This is not production level loading or progression.
     /// </summary>
     [DisallowMultipleComponent]
@@ -24,9 +24,8 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private DropTheManSceneController sceneController;
         [SerializeField] private bool bootstrapOnStart = true;
         [SerializeField] private DropTheManDevLevelSource levelSource =
-            DropTheManDevLevelSource.InspectorDevData;
-        [SerializeField] private TextAsset jsonLevelAsset;
-        [SerializeField] private TextAsset[] levelSequence = Array.Empty<TextAsset>();
+            DropTheManDevLevelSource.ResourcesCatalog;
+        [SerializeField] private string resourcesLevelCatalogPath = "DropTheMan/Levels";
         [SerializeField, Min(0)] private int startingLevelIndex;
         [FormerlySerializedAs("boardWorldOrigin")]
         [SerializeField] private Vector3 boardWorldCenter = Vector3.zero;
@@ -45,6 +44,7 @@ namespace DropAwayPrototype.Runtime
         public DropTheManRuntimeModel RuntimeModel { get; private set; }
         public RuntimeLevelContext FrameworkContext { get; private set; }
 
+        private LevelCatalog _levelCatalog;
         private int _currentLevelIndex = -1;
         private string _currentLevelId = string.Empty;
         private string _currentDisplayName = string.Empty;
@@ -120,9 +120,10 @@ namespace DropAwayPrototype.Runtime
 
         public bool TryBootstrap(out string failureReason)
         {
-            if (HasLevelSequence())
+            if (levelSource == DropTheManDevLevelSource.ResourcesCatalog)
             {
-                if (!CanUseLevelSequence(out failureReason))
+                if (!CanUseLevelCatalog(out failureReason) ||
+                    !TryDiscoverLevelCatalog(out failureReason))
                 {
                     return false;
                 }
@@ -130,6 +131,7 @@ namespace DropAwayPrototype.Runtime
                 return TryLoadLevelAtIndex(ResolveStartingLevelIndex(), out failureReason);
             }
 
+            _levelCatalog = null;
             _currentLevelIndex = -1;
             return TryBootstrapConfiguredSource(out failureReason);
         }
@@ -145,29 +147,44 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (HasLevelSequence() && IsValidLevelSequenceIndex(_currentLevelIndex))
+            if (levelSource == DropTheManDevLevelSource.ResourcesCatalog)
             {
-                return TryLoadLevelAtIndex(_currentLevelIndex, out failureReason);
+                if (!HasLevelCatalog())
+                {
+                    failureReason = "No level catalog has been discovered.";
+                    return false;
+                }
+
+                int restartIndex = IsValidLevelCatalogIndex(_currentLevelIndex)
+                    ? _currentLevelIndex
+                    : ResolveStartingLevelIndex();
+                return TryLoadLevelAtIndex(restartIndex, out failureReason);
             }
 
             return TryBootstrapConfiguredSource(out failureReason);
         }
 
         /// <summary>
-        /// Loads the next JSON level from the configured scene-local sequence.
+        /// Loads the next JSON level from the discovered Resources catalog.
         /// This remains prototype-owned test-scene flow rather than framework progression.
         /// </summary>
         public bool TryLoadNextLevel(out string failureReason)
         {
-            if (!CanUseLevelSequence(out failureReason))
+            if (!CanUseLevelCatalog(out failureReason))
             {
                 return false;
             }
 
-            int nextLevelIndex = _currentLevelIndex + 1;
-            if (!IsValidLevelSequenceIndex(nextLevelIndex))
+            if (!HasLevelCatalog())
             {
-                failureReason = "No next level exists in the configured sequence.";
+                failureReason = "No level catalog has been discovered.";
+                return false;
+            }
+
+            int nextLevelIndex = _currentLevelIndex + 1;
+            if (!IsValidLevelCatalogIndex(nextLevelIndex))
+            {
+                failureReason = "No next level exists in the discovered catalog.";
                 return false;
             }
 
@@ -176,28 +193,28 @@ namespace DropAwayPrototype.Runtime
 
         private bool TryLoadLevelAtIndex(int levelIndex, out string failureReason)
         {
-            if (!HasLevelSequence())
+            if (!HasLevelCatalog())
             {
-                failureReason = "No level sequence is configured.";
+                failureReason = "No level catalog has been discovered.";
                 return false;
             }
 
-            if (!IsValidLevelSequenceIndex(levelIndex))
+            if (!IsValidLevelCatalogIndex(levelIndex))
             {
                 failureReason =
-                    $"Level sequence index {levelIndex} is outside the configured range.";
+                    $"Level catalog index {levelIndex} is outside the discovered range.";
                 return false;
             }
 
-            TextAsset levelAsset = levelSequence[levelIndex];
-            if (levelAsset == null)
+            if (!_levelCatalog.TryGetEntry(levelIndex, out LevelCatalogEntry catalogEntry) ||
+                catalogEntry.Asset == null)
             {
-                failureReason = $"Level sequence entry {levelIndex} is null.";
+                failureReason = $"Level catalog entry {levelIndex} is unavailable.";
                 return false;
             }
 
             bool loaded = TryBootstrapFromProvider(
-                new DropTheManJsonLevelDefinitionProvider(levelAsset),
+                new DropTheManJsonLevelDefinitionProvider(catalogEntry.Asset),
                 out LevelDefinition levelDefinition,
                 out failureReason);
             if (!loaded)
@@ -503,9 +520,7 @@ namespace DropAwayPrototype.Runtime
 
         private IDropTheManLevelDefinitionProvider CreateLevelDefinitionProvider()
         {
-            return levelSource == DropTheManDevLevelSource.JsonTextAsset
-                ? new DropTheManJsonLevelDefinitionProvider(jsonLevelAsset)
-                : new DropTheManDevLevelDefinitionProvider(levelData);
+            return new DropTheManDevLevelDefinitionProvider(levelData);
         }
 
         private static bool TryCreateTimer(
@@ -549,7 +564,7 @@ namespace DropAwayPrototype.Runtime
         private enum DropTheManDevLevelSource
         {
             InspectorDevData = 0,
-            JsonTextAsset = 1
+            ResourcesCatalog = 1
         }
 
         private enum LevelResultState
@@ -571,46 +586,68 @@ namespace DropAwayPrototype.Runtime
             _resultWindowVisible = false;
         }
 
-        private bool HasLevelSequence()
+        private bool HasLevelCatalog()
         {
-            return levelSequence != null && levelSequence.Length > 0;
+            return _levelCatalog != null && _levelCatalog.Count > 0;
         }
 
         private int ResolveStartingLevelIndex()
         {
-            if (!HasLevelSequence())
+            if (!HasLevelCatalog())
             {
                 return -1;
             }
 
-            return Mathf.Clamp(startingLevelIndex, 0, levelSequence.Length - 1);
+            return Mathf.Clamp(startingLevelIndex, 0, _levelCatalog.Count - 1);
         }
 
-        private bool IsValidLevelSequenceIndex(int levelIndex)
+        private bool IsValidLevelCatalogIndex(int levelIndex)
         {
-            return HasLevelSequence() &&
+            return HasLevelCatalog() &&
                    levelIndex >= 0 &&
-                   levelIndex < levelSequence.Length;
+                   levelIndex < _levelCatalog.Count;
         }
 
         private bool HasNextLevel()
         {
-            return IsValidLevelSequenceIndex(_currentLevelIndex + 1);
+            return IsValidLevelCatalogIndex(_currentLevelIndex + 1);
         }
 
-        private bool CanUseLevelSequence(out string failureReason)
+        private bool CanUseLevelCatalog(out string failureReason)
         {
-            if (!HasLevelSequence())
+            if (levelSource != DropTheManDevLevelSource.ResourcesCatalog)
             {
-                failureReason = "No level sequence is configured.";
+                failureReason = "The Resources level catalog source is not selected.";
                 return false;
             }
 
             if (!spawnRuntimeViews)
             {
                 failureReason =
-                    "Level sequencing requires runtime view spawning so levels can reload cleanly.";
+                    "Level catalog sequencing requires runtime view spawning so levels can reload cleanly.";
                 return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private bool TryDiscoverLevelCatalog(out string failureReason)
+        {
+            LevelCatalogBuildResult catalogResult = ResourcesLevelCatalogLoader.Load(
+                resourcesLevelCatalogPath,
+                new DropTheManLevelCatalogMetadataReader());
+            if (!catalogResult.Success)
+            {
+                _levelCatalog = null;
+                failureReason = catalogResult.FailureReason;
+                return false;
+            }
+
+            _levelCatalog = catalogResult.Catalog;
+            for (int i = 0; i < catalogResult.Warnings.Count; i++)
+            {
+                Debug.LogWarning(catalogResult.Warnings[i], this);
             }
 
             failureReason = string.Empty;

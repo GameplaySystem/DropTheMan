@@ -493,7 +493,8 @@ Phase 3A should implement:
 * a temporary `OnGUI` save/export action in the play-mode HUD
 * export of the current authored `DropTheManDevLevelData`
 * reuse of the existing `Drop The Man` JSON schema and export helper path
-* file output to a simple project-local path such as `Assets/GameModules/Levels/EditorExports/...`
+* file output to the runtime-discoverable project path
+  `Assets/Resources/DropTheMan/Levels/...`
 * useful success or failure reporting to the HUD and Console
 * validation that rejects invalid authored data before writing JSON
 
@@ -513,6 +514,8 @@ Ownership rule:
 * the existing prototype-owned JSON provider remains the owner of schema conversion
 * file writing remains prototype-owned and must not add Drop The Man-specific logic to `PuzzleFramework`
 * default export naming should derive from the current `Level Id` so repeated exports do not collapse into one ambiguous fixed filename
+* exported catalog levels must use canonical positive `Level N` ids; Unity refresh makes valid
+  exports available to the Resources-backed gameplay catalog without scene-array wiring
 
 Current naming direction:
 

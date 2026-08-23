@@ -16,7 +16,7 @@ namespace DropAwayPrototype.Editor
     public static class DropTheManEditorJsonExportUtility
     {
         public const string DefaultExportDirectory =
-            "Assets/GameModules/Levels/EditorExports";
+            "Assets/Resources/DropTheMan/Levels";
 
         public static string BuildSuggestedProjectRelativeExportPath(string levelId)
         {

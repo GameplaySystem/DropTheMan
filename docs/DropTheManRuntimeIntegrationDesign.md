@@ -80,14 +80,19 @@ Phase 4A addendum:
 * spawned views still remain presentation/input adapters only; runtime state stays gameplay
   authority
 
-Phase 4B addendum:
+Phase 4B addendum and catalog follow-up:
 
-* the dev gameplay bootstrapper may also own a prototype-only serialized `TextAsset[]`
-  level sequence plus current-level index for the gameplay test scene
+* the dev gameplay bootstrapper may own a Resources-relative catalog path plus current-level index
+  for the gameplay test scene
+* framework catalog infrastructure owns Resources discovery, generic metadata validation, duplicate
+  rejection, gap warnings, and deterministic ordering
+* the Drop The Man metadata adapter owns JSON validation and canonical `Level N` interpretation
 * same-scene restart and next-level loading should reuse the existing JSON -> framework build ->
   runtime model -> runtime view spawn -> scene-controller initialization path
 * a minimal prototype-owned `OnGUI` result window is acceptable for this slice
 * this sequence owner is scene-local gameplay flow, not framework progression
+* the Resources catalog integration passed owner validation for Level 1 discovery/restart and
+  deterministic Next loading of Level 2 without Console errors
 
 ---
 
@@ -775,7 +780,7 @@ For the current gameplay test scene, a higher-level prototype-owned loop may sit
 composition layer to:
 
 ```text
-choose a level asset from a serialized sequence
+discover and choose a level asset from the Resources catalog
     ->
 run the existing bootstrap/build/spawn path
     ->
@@ -784,7 +789,9 @@ observe accepted Won/Lost state
 show a temporary OnGUI Restart/Next result window
 ```
 
-That loop still must not become framework progression, persistence, or a general content catalog.
+That loop still must not become framework progression or persistence. Generic catalog discovery and
+ordering remain in the framework Content Systems layer; Drop The Man retains its puzzle-specific
+metadata and runtime-loading consequences.
 
 It should directly connect:
 
