@@ -115,6 +115,13 @@ The stencil aperture must:
 * remain visually invisible
 * avoid owning gameplay colliders
 
+The inner-cavity material should read the aperture's stencil reference with comparison `Equal`.
+Board receiver materials continue to use `NotEqual`. This keeps the interior visible through the
+opening without making the cavity or stencil mesh authoritative for gameplay.
+
+The single-hole prefab now uses this material on its inner-wall submesh, and the configuration
+passed Game-view validation.
+
 All visual parts should share a consistent authored origin where practical. The prefab wrapper
 still remains authoritative for the logical footprint origin and final visual offset.
 

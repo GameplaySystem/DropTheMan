@@ -9,7 +9,8 @@ Shader "DropAwayPrototype/Stencil Test/Receiver Lit"
         [ToggleOff] _SpecularHighlights("Specular Highlights", Float) = 1.0
         [ToggleOff] _EnvironmentReflections("Environment Reflections", Float) = 1.0
         [ToggleUI] _ReceiveShadows("Receive Shadows", Float) = 1.0
-        [IntRange] _StencilRef("Rejected Stencil Reference", Range(1, 255)) = 1
+        [IntRange] _StencilRef("Stencil Reference", Range(1, 255)) = 1
+        [Enum(UnityEngine.Rendering.CompareFunction)] _StencilComp("Stencil Comparison", Float) = 6
 
         [HideInInspector] _WorkflowMode("Workflow Mode", Float) = 1.0
         [HideInInspector] _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
@@ -83,7 +84,7 @@ Shader "DropAwayPrototype/Stencil Test/Receiver Lit"
                 Ref [_StencilRef]
                 ReadMask 255
                 WriteMask 0
-                Comp NotEqual
+                Comp [_StencilComp]
                 Pass Keep
                 Fail Keep
                 ZFail Keep

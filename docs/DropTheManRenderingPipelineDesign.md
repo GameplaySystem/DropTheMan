@@ -88,9 +88,12 @@ features:
 * an invisible writer renders at queue `Geometry-1`, writes stencil reference `1`, writes no color
   or depth, and uses `ZTest LEqual`
 * a Lit receiver renders at queue `Geometry`, uses URP's Lit input/forward implementation with the
-  stencil state declared directly on its ForwardLit pass, and rejects pixels where stencil
-  reference `1` is present
-* the writer and receiver expose matching stencil-reference properties so another value can be
+  stencil state declared directly on its ForwardLit pass, and exposes both stencil reference and
+  comparison as material properties
+* board receivers use `NotEqual` so pixels under reference `1` are suppressed
+* the inner-cavity test material uses `Equal` so cavity pixels render only through the aperture
+  that wrote reference `1`
+* the writer and receivers expose matching stencil-reference properties so another value can be
   tested without editing shader source
 
 The experiment assets live under:
@@ -102,6 +105,12 @@ Assets/RuntimeAssets/Rendering/StencilTest/
 The proof includes separate stencil-aware grid and cell materials that preserve the current
 artist-authored base colors and surface values. They replace the existing two material slots during
 testing; they are never appended as an extra pass. The originals remain unchanged.
+
+`Hole_Inner_Cavity_Stencil.mat` is the validated real-hole cavity material baseline. It preserves
+the current dark-blue inner material values, uses backface culling, and selects stencil comparison
+`Equal` with reference `1`. It replaces `Holes_Inner_Material` on the inner-wall submesh; it is not
+appended as an additional material slot. Game-view validation confirmed that the cavity remains
+visible through the aperture without rendering below or outside its silhouette.
 
 This is still not the final cell shader. The receiver currently defines only its ForwardLit pass
 and does not define dedicated shadow-caster, depth-only, depth-normals, meta, or motion-vector
@@ -119,6 +128,7 @@ After pipeline or material changes, manually check both dedicated scenes:
 * `DropTheManLevelEditor` renders the board and authoring previews without pink materials
 * `DropTheManDevTest` loads and plays a JSON level without rendering regressions
 * board cells, half-walls, convex corners, and concave corners retain their intended colors
+* inner cavity walls appear through the stencil aperture but not below or outside its silhouette
 * lighting and shadows remain acceptable in the Game view
 * the Console has no shader, renderer, or missing-reference errors
 
