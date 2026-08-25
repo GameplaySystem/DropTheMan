@@ -3,6 +3,7 @@ using PuzzleFramework.CoreBoard;
 using PuzzleFramework.Presentation;
 using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
+using DropAwayPrototype.Editor;
 using UnityEngine;
 using UnityEngine.Serialization;
 using System.Collections.Generic;
@@ -32,7 +33,7 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Vector2 cellSize = Vector2.one;
         [SerializeField] private Vector3 boardGridXAxis = Vector3.right;
         [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
-        [SerializeField] private bool spawnRuntimeViews = true;
+        [SerializeField] private DropTheManEditorConfig visualConfig;
         [SerializeField] private Transform runtimeViewSpawnRoot;
         [Header("Generated Board Visuals")]
         [SerializeField] private ModularBoardCellView boardCellVisualPrefab;
@@ -368,26 +369,17 @@ namespace DropAwayPrototype.Runtime
             TimerSystem timerSystem,
             out string failureReason)
         {
-            if (spawnRuntimeViews)
+            if (!TrySpawnRuntimeViews(
+                    runtimeModel,
+                    worldLayout,
+                    out DropTheManHoleView[] runtimeHoleViews,
+                    out DropTheManStickmanView[] runtimeStickmanViews,
+                    out failureReason))
             {
-                if (!TrySpawnRuntimeViews(
-                        runtimeModel,
-                        worldLayout,
-                        out DropTheManHoleView[] runtimeHoleViews,
-                        out DropTheManStickmanView[] runtimeStickmanViews,
-                        out failureReason))
-                {
-                    return DropTheManRuntimeControllerResult.Failed(failureReason);
-                }
+                return DropTheManRuntimeControllerResult.Failed(failureReason);
+            }
 
-                sceneController.SetRuntimeViews(runtimeHoleViews, runtimeStickmanViews);
-            }
-            else
-            {
-                sceneController.SetRuntimeViews(
-                    new List<DropTheManHoleView>(sceneController.HoleViewTemplates).ToArray(),
-                    new List<DropTheManStickmanView>(sceneController.StickmanViewTemplates).ToArray());
-            }
+            sceneController.SetRuntimeViews(runtimeHoleViews, runtimeStickmanViews);
 
             DropTheManRuntimeControllerResult initializeResult =
                 sceneController.Initialize(
@@ -463,24 +455,32 @@ namespace DropAwayPrototype.Runtime
             out DropTheManStickmanView[] runtimeStickmanViews,
             out string failureReason)
         {
-            DropTheManHoleView holeTemplate = ResolveFirstTemplate(sceneController.HoleViewTemplates);
-            if (holeTemplate == null)
+            DropTheManHoleView holePrefab = ResolveFirstPrefab(sceneController.HoleViewPrefabs);
+            if (holePrefab == null)
             {
                 runtimeHoleViews = null;
                 runtimeStickmanViews = null;
                 failureReason =
-                    "Runtime spawning requires at least one hole view template on the scene controller.";
+                    "Runtime spawning requires at least one hole view prefab on the scene controller.";
                 return false;
             }
 
-            DropTheManStickmanView stickmanTemplate =
-                ResolveFirstTemplate(sceneController.StickmanViewTemplates);
-            if (stickmanTemplate == null)
+            if (visualConfig == null)
             {
                 runtimeHoleViews = null;
                 runtimeStickmanViews = null;
                 failureReason =
-                    "Runtime spawning requires at least one stickman view template on the scene controller.";
+                    "Runtime spawning requires a Drop The Man visual config.";
+                return false;
+            }
+
+            DropTheManStickmanView collectablePrefab = visualConfig.collectableViewPrefab;
+            if (collectablePrefab == null)
+            {
+                runtimeHoleViews = null;
+                runtimeStickmanViews = null;
+                failureReason =
+                    "Runtime spawning requires a collectable view prefab in the Drop The Man visual config.";
                 return false;
             }
 
@@ -491,27 +491,27 @@ namespace DropAwayPrototype.Runtime
             return new DropTheManRuntimeLevelViewSpawner().TrySpawnViews(
                 runtimeModel,
                 worldLayout,
-                holeTemplate,
-                stickmanTemplate,
+                holePrefab,
+                collectablePrefab,
                 spawnRoot,
                 out runtimeHoleViews,
                 out runtimeStickmanViews,
                 out failureReason);
         }
 
-        private static T ResolveFirstTemplate<T>(IReadOnlyList<T> templates)
+        private static T ResolveFirstPrefab<T>(IReadOnlyList<T> prefabs)
             where T : UnityEngine.Object
         {
-            if (templates == null)
+            if (prefabs == null)
             {
                 return null;
             }
 
-            for (int i = 0; i < templates.Count; i++)
+            for (int i = 0; i < prefabs.Count; i++)
             {
-                if (templates[i] != null)
+                if (prefabs[i] != null)
                 {
-                    return templates[i];
+                    return prefabs[i];
                 }
             }
 
@@ -621,13 +621,6 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (!spawnRuntimeViews)
-            {
-                failureReason =
-                    "Level catalog sequencing requires runtime view spawning so levels can reload cleanly.";
-                return false;
-            }
-
             failureReason = string.Empty;
             return true;
         }
@@ -656,13 +649,6 @@ namespace DropAwayPrototype.Runtime
 
         private bool CanReloadCurrentLevel(out string failureReason)
         {
-            if (!spawnRuntimeViews)
-            {
-                failureReason =
-                    "Restart requires runtime view spawning because pre-placed views do not yet reset cleanly.";
-                return false;
-            }
-
             failureReason = string.Empty;
             return true;
         }
@@ -736,8 +722,8 @@ namespace DropAwayPrototype.Runtime
         public bool TrySpawnViews(
             DropTheManRuntimeModel runtimeModel,
             GridWorldLayout worldLayout,
-            DropTheManHoleView holeTemplate,
-            DropTheManStickmanView stickmanTemplate,
+            DropTheManHoleView holePrefab,
+            DropTheManStickmanView collectablePrefab,
             Transform spawnRoot,
             out DropTheManHoleView[] spawnedHoleViews,
             out DropTheManStickmanView[] spawnedStickmanViews,
@@ -752,15 +738,15 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (holeTemplate == null)
+            if (holePrefab == null)
             {
-                failureReason = "A hole view template is required for runtime spawning.";
+                failureReason = "A hole view prefab is required for runtime spawning.";
                 return false;
             }
 
-            if (stickmanTemplate == null)
+            if (collectablePrefab == null)
             {
-                failureReason = "A stickman view template is required for runtime spawning.";
+                failureReason = "A collectable view prefab is required for runtime spawning.";
                 return false;
             }
 
@@ -770,9 +756,6 @@ namespace DropAwayPrototype.Runtime
             DestroyChildren(holesRoot);
             DestroyChildren(stickmenRoot);
 
-            holeTemplate.SetTemplateHidden(true);
-            stickmanTemplate.SetTemplateHidden(true);
-
             spawnedHoleViews = new DropTheManHoleView[runtimeModel.Holes.Count];
             for (int i = 0; i < runtimeModel.Holes.Count; i++)
             {
@@ -780,10 +763,10 @@ namespace DropAwayPrototype.Runtime
                 Vector3 worldPosition = ToWorldPosition(
                     worldLayout,
                     hole.CurrentCoordinate,
-                    holeTemplate.transform.position.y);
+                    holePrefab.transform.position.y);
 
                 DropTheManHoleView holeView = UnityEngine.Object.Instantiate(
-                    holeTemplate,
+                    holePrefab,
                     holesRoot);
                 holeView.name = $"Hole_{hole.Id}";
                 holeView.ConfigureSpawnedView(hole.Id, worldPosition, hole.ColorIdentity);
@@ -797,10 +780,10 @@ namespace DropAwayPrototype.Runtime
                 Vector3 worldPosition = ToWorldPosition(
                     worldLayout,
                     stickman.Coordinate,
-                    stickmanTemplate.transform.position.y);
+                    collectablePrefab.transform.position.y);
 
                 DropTheManStickmanView stickmanView =
-                    UnityEngine.Object.Instantiate(stickmanTemplate, stickmenRoot);
+                    UnityEngine.Object.Instantiate(collectablePrefab, stickmenRoot);
                 stickmanView.name = $"Stickman_{stickman.Id}";
                 stickmanView.ConfigureSpawnedView(
                     stickman.Id,

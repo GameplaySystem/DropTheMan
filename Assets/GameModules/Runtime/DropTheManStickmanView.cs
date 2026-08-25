@@ -4,7 +4,7 @@ using PuzzleFramework.Presentation;
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
-    /// Minimal pre-placed scene adapter for a Drop The Man stickman.
+    /// Minimal spawned presentation adapter for a Drop The Man collectable.
     /// Collection eligibility is already decided by runtime rules before this component is
     /// notified at the visual trigger threshold. The placeholder completes synchronously.
     /// </summary>
@@ -19,7 +19,6 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Collider[] collidersToDisable;
 
         private bool _collectionStarted;
-        private bool _templateHidden;
         private bool _isSpawnedClone;
 
         public string RuntimeId => runtimeId;
@@ -86,7 +85,6 @@ namespace DropAwayPrototype.Runtime
             runtimeId = newRuntimeId;
             transform.position = worldPosition;
             _collectionStarted = false;
-            _templateHidden = false;
             _isSpawnedClone = true;
             EnsurePresentationTargets();
 
@@ -113,13 +111,6 @@ namespace DropAwayPrototype.Runtime
             }
 
             DropTheManViewPresentationUtility.ApplyColor(renderersToHide, colorIdentity);
-            ApplyTemplateHiddenState();
-        }
-
-        public void SetTemplateHidden(bool isHidden)
-        {
-            _templateHidden = isHidden;
-            ApplyTemplateHiddenState();
         }
 
         private void EnsurePresentationTargets()
@@ -135,29 +126,5 @@ namespace DropAwayPrototype.Runtime
             }
         }
 
-        private void ApplyTemplateHiddenState()
-        {
-            if (collidersToDisable != null)
-            {
-                for (int i = 0; i < collidersToDisable.Length; i++)
-                {
-                    if (collidersToDisable[i] != null)
-                    {
-                        collidersToDisable[i].enabled = !_templateHidden && !_collectionStarted;
-                    }
-                }
-            }
-
-            if (renderersToHide != null)
-            {
-                for (int i = 0; i < renderersToHide.Length; i++)
-                {
-                    if (renderersToHide[i] != null)
-                    {
-                        renderersToHide[i].enabled = !_templateHidden && !_collectionStarted;
-                    }
-                }
-            }
-        }
     }
 }

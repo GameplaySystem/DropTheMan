@@ -81,8 +81,8 @@ authoring code expands further.
 
 Add gameplay play/test behavior and runtime spawning in the same slice.
 
-Rejected because current runtime scene wiring still assumes pre-placed runtime views, and
-spawning is a separate prototype runtime concern.
+Rejected for the initial editor slice because runtime scene wiring still assumed pre-placed
+runtime views at that time, and spawning was a separate prototype runtime concern.
 
 ### Recommended Approach
 
@@ -337,12 +337,13 @@ This means:
 
 The prototype should own a `DropTheManEditorConfig` `ScriptableObject`.
 
-Its job is authoring configuration, not runtime gameplay state.
+Its primary job is authoring configuration, but it may also hold prototype-owned visual prefab
+references shared with gameplay composition. It must not hold mutable runtime gameplay state.
 
 It should be ready to hold:
 
 * editor cell prefab or visual settings
-* stickman preview prefab
+* one collectable view prefab used for editor previews and gameplay runtime spawning
 * blocked-cell visual or material
 * hole palette entries
 * color materials for ten color slots
@@ -353,6 +354,7 @@ This asset belongs in `DropAwayPrototype`, not in `PuzzleFramework`.
 Reason:
 
 * the asset contains prototype-specific authoring tools and visuals
+* sharing the collectable prefab avoids a duplicate scene-local gameplay template
 * the framework editor foundation must remain puzzle-agnostic
 
 ---
@@ -414,15 +416,17 @@ Default rule:
 
 ## Gameplay Play/Test Decision
 
-Actual gameplay play/test behavior is explicitly out of scope for the current editor phases.
+Actual gameplay play/test behavior was explicitly out of scope for the editor phases.
 
 Reason:
 
-* the current runtime playable-scene path still assumes pre-placed runtime view objects
-* a real gameplay play/test button would drag runtime spawning or a temporary preview-runtime path into this slice
+* the runtime playable-scene path initially assumed pre-placed runtime view objects
+* a real gameplay play/test button would have dragged runtime spawning or a temporary
+  preview-runtime path into that editor slice
 
-If gameplay play/test is added later, it should be documented as a separate prototype runtime
-integration step.
+Gameplay runtime spawning was later implemented as a separate prototype integration path. The
+gameplay scene now spawns collectables from the shared prototype visual config; this does not turn
+the authoring scene into a gameplay play/test bridge.
 
 ---
 

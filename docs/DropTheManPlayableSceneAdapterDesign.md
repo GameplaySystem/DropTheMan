@@ -49,8 +49,8 @@ The next implementation must make the prototype playable without letting scene o
 Phase 4A resolution:
 
 * gameplay scene objects no longer need authored runtime ids for every hole and stickman
-* the dev gameplay bootstrapper may clone one hole template and one stickman template into
-  runtime-spawned views after JSON or dev-data loading succeeds
+* the dev gameplay bootstrapper may clone one hole prefab and the config-owned collectable prefab
+  into runtime-spawned views after JSON or dev-data loading succeeds
 * the spawned views then register through the existing scene-controller/runtime-controller path
 
 Phase 4B resolution and catalog follow-up:
@@ -73,7 +73,8 @@ Phase 4B resolution and catalog follow-up:
 This design assumes:
 
 * runtime model construction already happened before scene adapter play begins
-* one or more scene-local template views exist for cloning
+* a hole prefab reference exists on the scene controller for the current single-hole slice
+* a collectable view prefab exists in the shared prototype visual config
 * spawned runtime hole and stickman views receive ids from `HoleRuntimeState.Id` and
   `StickmanRuntimeState.Id`
 * the scene adapter receives or creates a `DropTheManRuntimeController` through the existing prototype bootstrapper path
@@ -102,7 +103,7 @@ This design still defers:
 
 The scene adapter layer owns:
 
-* serialized template MonoBehaviour view adapters used for runtime spawning
+* serialized prefab references used for runtime spawning
 * runtime-spawned hole and stickman view registration
 * pointer hit-testing against selectable hole views
 * pointer screen-to-world conversion
@@ -202,7 +203,7 @@ MonoBehaviour scene composition adapter.
 
 Responsibilities:
 
-* hold serialized references to hole and stickman template views
+* hold the current serialized hole prefab reference
 * allow the bootstrapper to replace the runtime-registered view arrays with spawned clones
 * provide or receive the already-built runtime model path for MVP
 * own scene-level movement-feel tuning such as collection trigger radius and `dragClearanceInsetCells`
@@ -251,7 +252,8 @@ HoleRuntimeState.Id -> spawned DropTheManHoleView.runtimeId
 StickmanRuntimeState.Id -> spawned DropTheManStickmanView.runtimeId
 ```
 
-The scene-local template views do not need to keep content-specific ids after this slice.
+Prefab source views do not need to keep content-specific ids. Spawned clones receive ids from the
+runtime model.
 
 ### Validation Policy
 
@@ -278,8 +280,9 @@ Reason:
 
 ### Future Alternatives
 
-Dedicated prefab assets or richer runtime-generated view pipelines may replace the current
-scene-template cloning path later.
+The collectable source is now a dedicated prefab referenced by the shared prototype visual config.
+Hole selection still uses the current scene-controller prefab reference until shape-aware hole
+resolution is implemented.
 
 ---
 
@@ -588,13 +591,13 @@ The scene adapter should not duplicate outcome guarding; it should only stop fee
 Recommended MVP scene startup:
 
 ```text
-scene has one hole template view and one stickman template view
+scene controller has one hole prefab and the bootstrapper has the shared visual config
     ->
 scene controller / dev bootstrapper discovers the configured Resources level catalog
     ->
 runtime model is built
     ->
-dev bootstrapper clones spawned hole/stickman views from templates and assigns ids/colors/positions
+dev bootstrapper clones hole/collectable prefabs and assigns ids/colors/positions
     ->
 scene controller passes spawned view arrays to DropTheManRuntimeBootstrapper.CreateController(...)
     ->
@@ -633,7 +636,8 @@ Allowed minimal behavior:
 * timer may have no UI
 * terminal outcome may disable input and surface through a temporary `OnGUI` result window
 * startup failure may log a direct error
-* runtime spawning may clone scene-local templates instead of dedicated prefab assets for now
+* hole spawning may use the single scene-controller prefab reference until shape-aware resolution
+  exists
 
 Deliberately not included:
 

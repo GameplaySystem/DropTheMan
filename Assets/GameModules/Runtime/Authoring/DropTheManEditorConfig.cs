@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
+using DropAwayPrototype.Runtime;
 using PuzzleFramework.Presentation;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace DropAwayPrototype.Editor
 {
     /// <summary>
-    /// Prototype-owned authoring configuration for the scene-based Drop The Man editor shell.
-    /// This stores authoring visuals and palette data only; it is not runtime gameplay state.
+    /// Prototype-owned visual configuration shared by the Drop The Man authoring and gameplay
+    /// composition layers. This stores prefab and palette references, never runtime gameplay state.
     /// </summary>
     [CreateAssetMenu(
         fileName = "DropTheManEditorConfig",
@@ -17,7 +19,8 @@ namespace DropAwayPrototype.Editor
         [Min(1)] public int defaultBoardWidth = 5;
         [Min(1)] public int defaultBoardHeight = 5;
         public ModularBoardCellView editorCellPrefab;
-        public GameObject stickmanPreviewPrefab;
+        [FormerlySerializedAs("stickmanPreviewPrefab")]
+        public DropTheManStickmanView collectableViewPrefab;
         public Material blockedCellMaterial;
         public List<Material> colorSlotMaterials = new();
         public List<DropTheManEditorHolePaletteEntry> holePaletteEntries = new();

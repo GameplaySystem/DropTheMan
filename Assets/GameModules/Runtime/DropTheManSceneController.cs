@@ -1,6 +1,7 @@
 using PuzzleFramework.CoreBoard;
 using PuzzleFramework.RuntimeFlow;
 using UnityEngine;
+using UnityEngine.Serialization;
 using System;
 using System.Collections.Generic;
 
@@ -14,8 +15,8 @@ namespace DropAwayPrototype.Runtime
     [DisallowMultipleComponent]
     public sealed class DropTheManSceneController : MonoBehaviour
     {
-        [SerializeField] private DropTheManHoleView[] holeViews;
-        [SerializeField] private DropTheManStickmanView[] stickmanViews;
+        [FormerlySerializedAs("holeViews")]
+        [SerializeField] private DropTheManHoleView[] holeViewPrefabs;
         [SerializeField] private DropTheManPointerInputAdapter pointerInputAdapter;
         [SerializeField] private bool startGameplayOnInitialize = true;
         [SerializeField] private bool tickTimerInUpdate = true;
@@ -33,10 +34,8 @@ namespace DropAwayPrototype.Runtime
         public bool IsInitialized => _isInitialized;
         public bool HasActiveRuntimeDrag =>
             _runtimeController != null && _runtimeController.HasActiveDrag;
-        public IReadOnlyList<DropTheManHoleView> HoleViewTemplates =>
-            holeViews ?? Array.Empty<DropTheManHoleView>();
-        public IReadOnlyList<DropTheManStickmanView> StickmanViewTemplates =>
-            stickmanViews ?? Array.Empty<DropTheManStickmanView>();
+        public IReadOnlyList<DropTheManHoleView> HoleViewPrefabs =>
+            holeViewPrefabs ?? Array.Empty<DropTheManHoleView>();
         public bool InputEnabled =>
             _isInitialized &&
             _inputEnabled &&
@@ -45,8 +44,8 @@ namespace DropAwayPrototype.Runtime
 
         private void Awake()
         {
-            _runtimeHoleViews = holeViews ?? Array.Empty<DropTheManHoleView>();
-            _runtimeStickmanViews = stickmanViews ?? Array.Empty<DropTheManStickmanView>();
+            _runtimeHoleViews = Array.Empty<DropTheManHoleView>();
+            _runtimeStickmanViews = Array.Empty<DropTheManStickmanView>();
 
             if (pointerInputAdapter == null)
             {

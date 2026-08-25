@@ -576,9 +576,9 @@ namespace DropAwayPrototype.Editor
                     GetBoardNormal(worldLayout) * 0.20f,
                     Quaternion.identity);
 
-                if (config != null && config.stickmanPreviewPrefab != null)
+                if (config != null && config.collectableViewPrefab != null)
                 {
-                    GameObject preview = Instantiate(config.stickmanPreviewPrefab);
+                    GameObject preview = Instantiate(config.collectableViewPrefab.gameObject);
                     preview.transform.SetParent(rootObject.transform, worldPositionStays: false);
                     preview.transform.localPosition = Vector3.zero;
                     preview.transform.localRotation = Quaternion.identity;

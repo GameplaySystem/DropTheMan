@@ -75,8 +75,10 @@ This design also assumes no current approved need for:
 Phase 4A addendum:
 
 * JSON-driven gameplay runtime spawning is now an approved prototype-owned follow-up
-* the dev gameplay bootstrapper may clone one hole-view template and one stickman-view
-  template into runtime-spawned scene objects after the runtime model is built
+* the dev gameplay bootstrapper may clone one hole-view prefab and one collectable-view prefab
+  into runtime-spawned scene objects after the runtime model is built
+* the collectable prefab comes from the shared prototype visual config rather than a pre-placed
+  scene template
 * spawned views still remain presentation/input adapters only; runtime state stays gameplay
   authority
 
@@ -740,9 +742,8 @@ Do not include in that slice:
 These questions do not block the design, but they should be answered before editing scenes or prefabs:
 
 * Which MVP level source should the bootstrapper use first: serialized scene reference, test asset, loaded JSON, or an existing prototype content loader?
-* Runtime spawning now uses scene-local template views in the gameplay test scene; revisit
-  whether that should become dedicated prefab assets before broader level-selection or
-  gameplay-bridge work.
+* Collectable spawning now uses a dedicated prefab from the prototype visual config; hole prefab
+  selection remains scene-controller-owned until multiple hole shapes require a resolver.
 * Which board plane and camera should convert pointer screen positions into drag world positions?
 * Should timer start immediately on `Playing`, or after the first successful input?
 * What should the scene do visually when a stickman is `Collecting` but no animation system exists yet?

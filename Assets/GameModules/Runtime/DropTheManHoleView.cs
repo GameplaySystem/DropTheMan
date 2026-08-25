@@ -5,7 +5,7 @@ using UnityEngine;
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
-    /// Minimal pre-placed scene adapter for a Drop The Man hole.
+    /// Minimal spawned presentation adapter for a Drop The Man hole.
     /// This component exposes authored runtime id and transform/collider hooks only.
     /// Gameplay rules remain owned by runtime services.
     /// </summary>
@@ -22,11 +22,10 @@ namespace DropAwayPrototype.Runtime
         [SerializeField, Min(0.01f)] private float spawnedViewScaleMultiplier = 0.88f;
         [SerializeField] private DropTheManHolePresentation completionPresentation;
 
-        private bool _templateHidden;
         private bool _isSpawnedClone;
-        private bool _hasCapturedTemplateScale;
+        private bool _hasCapturedPrefabScale;
         private bool _completionPresentationStarted;
-        private Vector3 _templateLocalScale;
+        private Vector3 _prefabLocalScale;
 
         public string RuntimeId => runtimeId;
         public Vector3 WorldPosition => transform.position;
@@ -34,7 +33,7 @@ namespace DropAwayPrototype.Runtime
 
         private void Awake()
         {
-            CaptureTemplateScale();
+            CapturePrefabScale();
 
             if (selectionCollider == null)
             {
@@ -126,7 +125,6 @@ namespace DropAwayPrototype.Runtime
             ColorIdentity colorIdentity)
         {
             runtimeId = newRuntimeId;
-            _templateHidden = false;
             _isSpawnedClone = true;
             _completionPresentationStarted = false;
             ApplyWorldPosition(worldPosition);
@@ -136,12 +134,6 @@ namespace DropAwayPrototype.Runtime
             DropTheManViewPresentationUtility.ApplyColor(
                 renderersToHideWhenNotSelectable,
                 colorIdentity);
-            ApplySelectableState();
-        }
-
-        public void SetTemplateHidden(bool isHidden)
-        {
-            _templateHidden = isHidden;
             ApplySelectableState();
         }
 
@@ -158,8 +150,7 @@ namespace DropAwayPrototype.Runtime
             {
                 if (renderersToHideWhenNotSelectable[i] != null)
                 {
-                    renderersToHideWhenNotSelectable[i].enabled =
-                        !_templateHidden && isSelectable;
+                    renderersToHideWhenNotSelectable[i].enabled = isSelectable;
                 }
             }
         }
@@ -168,13 +159,13 @@ namespace DropAwayPrototype.Runtime
         {
             if (selectionCollider != null)
             {
-                selectionCollider.enabled = !_templateHidden && isSelectable;
+                selectionCollider.enabled = isSelectable;
             }
         }
 
         private void EnsurePresentationTargets()
         {
-            CaptureTemplateScale();
+            CapturePrefabScale();
 
             if (selectionCollider == null)
             {
@@ -194,22 +185,22 @@ namespace DropAwayPrototype.Runtime
             }
         }
 
-        private void CaptureTemplateScale()
+        private void CapturePrefabScale()
         {
-            if (_hasCapturedTemplateScale)
+            if (_hasCapturedPrefabScale)
             {
                 return;
             }
 
-            _templateLocalScale = transform.localScale;
-            _hasCapturedTemplateScale = true;
+            _prefabLocalScale = transform.localScale;
+            _hasCapturedPrefabScale = true;
         }
 
         private void ApplySpawnedScale()
         {
-            CaptureTemplateScale();
+            CapturePrefabScale();
             transform.localScale =
-                _templateLocalScale * Mathf.Max(0.01f, spawnedViewScaleMultiplier);
+                _prefabLocalScale * Mathf.Max(0.01f, spawnedViewScaleMultiplier);
         }
     }
 
