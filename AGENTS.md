@@ -4,7 +4,7 @@
 
 This repository is the `DropAwayPrototype` Unity project for the Drop The Man / Drop Away playable prototype.
 
-It consumes the shared `PuzzleFramework` package locally and owns Drop The Man-specific runtime rules, scene adapters, prototype content, and presentation placeholders.
+It consumes a commit-pinned Git revision of the shared `PuzzleFramework` package and owns Drop The Man-specific runtime rules, scene adapters, prototype content, and presentation placeholders.
 
 Framework code must remain in `PuzzleFramework`. Game-specific nouns and behavior such as holes, stickmen, collection, capacity, and Drop The Man win timing belong in this repository.
 
@@ -72,6 +72,17 @@ Documentation is the source of truth. If code and docs disagree, report the drif
 - Do not add third-party packages without approval.
 - Keep changes inside intentional source locations.
 
+## Framework Package Dependency Workflow
+
+- Follow `PuzzleFramework/docs/Workflow/FrameworkPackageDependencyWorkflow.md` when adopting a new framework revision.
+- Committed `Packages/manifest.json` entries must reference the framework Git repository, package subfolder, and a full 40-character commit SHA.
+- Do not commit relative or absolute `file:` dependencies, machine-specific paths, unpinned Git URLs, or mutable branch pins such as `#main`.
+- When prototype work depends on framework changes, commit and push `PuzzleFramework` first.
+- Verify the framework commit exists remotely before updating this repository's package pin.
+- Let Unity resolve `Packages/packages-lock.json`; commit the manifest and lock-file update together with the dependent prototype slice.
+- Compile and manually validate the prototype before committing or pushing a new framework pin.
+- Temporary local package overrides are allowed for iteration only if they remain uncommitted and are restored before final verification.
+
 ## Handoff Requirement
 
 After implementation, Codex must report:
@@ -92,3 +103,4 @@ Documentation-only tasks may use a shorter changed-files summary, but implementa
 - Keep commits scoped to one coherent change.
 - Do not revert, delete, or overwrite unrelated local changes.
 - When committing, stage explicit paths and exclude unrelated Unity-generated or user-owned changes.
+- Never commit or push this prototype with a framework SHA that has not already been pushed to the framework remote.
