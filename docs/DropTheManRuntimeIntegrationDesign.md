@@ -75,12 +75,19 @@ This design also assumes no current approved need for:
 Phase 4A addendum:
 
 * JSON-driven gameplay runtime spawning is now an approved prototype-owned follow-up
-* the dev gameplay bootstrapper may clone one hole-view prefab and one collectable-view prefab
-  into runtime-spawned scene objects after the runtime model is built
+* the dev gameplay bootstrapper may resolve each runtime hole footprint against the shared visual
+  config's hole palette and clone the matched hole-view prefab plus the config-owned collectable
+  prefab after the runtime model is built
+* hole shape matching compares exact offset sets across the four quarter-turn rotations; JSON stays
+  structural and does not gain presentation prefab identifiers
+* missing, duplicate, or rotationally ambiguous palette mappings fail startup instead of silently
+  falling back to another hole visual
 * the collectable prefab comes from the shared prototype visual config rather than a pre-placed
   scene template
 * spawned views still remain presentation/input adapters only; runtime state stays gameplay
   authority
+* owner validation confirmed that all eight configured canonical unrotated footprints spawn their
+  corresponding distinct hole visuals
 
 Phase 4B addendum and catalog follow-up:
 
@@ -742,8 +749,9 @@ Do not include in that slice:
 These questions do not block the design, but they should be answered before editing scenes or prefabs:
 
 * Which MVP level source should the bootstrapper use first: serialized scene reference, test asset, loaded JSON, or an existing prototype content loader?
-* Collectable spawning now uses a dedicated prefab from the prototype visual config; hole prefab
-  selection remains scene-controller-owned until multiple hole shapes require a resolver.
+* Collectable and shape-aware hole spawning now use the shared prototype visual config; the legacy
+  scene-controller hole prefab field remains serialized only for compatibility until a later
+  validated scene cleanup removes it.
 * Which board plane and camera should convert pointer screen positions into drag world positions?
 * Should timer start immediately on `Playing`, or after the first successful input?
 * What should the scene do visually when a stickman is `Collecting` but no animation system exists yet?

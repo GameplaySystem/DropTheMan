@@ -49,9 +49,14 @@ The next implementation must make the prototype playable without letting scene o
 Phase 4A resolution:
 
 * gameplay scene objects no longer need authored runtime ids for every hole and stickman
-* the dev gameplay bootstrapper may clone one hole prefab and the config-owned collectable prefab
-  into runtime-spawned views after JSON or dev-data loading succeeds
+* the dev gameplay bootstrapper resolves each runtime footprint against the visual config's hole
+  palette, then clones the matched hole prefab and config-owned collectable prefab after JSON or
+  dev-data loading succeeds
+* the resolver accepts quarter-turn variants of a canonical footprint and applies the same rotation
+  to the spawned logical root; it does not change JSON coordinates or gameplay footprints
 * the spawned views then register through the existing scene-controller/runtime-controller path
+* owner validation confirmed distinct runtime visuals for all eight configured canonical,
+  unrotated footprints; rotated and full interaction/completion coverage remains pending
 
 Phase 4B resolution and catalog follow-up:
 
@@ -73,7 +78,8 @@ Phase 4B resolution and catalog follow-up:
 This design assumes:
 
 * runtime model construction already happened before scene adapter play begins
-* a hole prefab reference exists on the scene controller for the current single-hole slice
+* each supported canonical hole shape has one palette entry with a root-level
+  `DropTheManHoleView`, prefab reference, and exact footprint offsets
 * a collectable view prefab exists in the shared prototype visual config
 * spawned runtime hole and stickman views receive ids from `HoleRuntimeState.Id` and
   `StickmanRuntimeState.Id`
@@ -153,7 +159,7 @@ Responsibilities:
 * expose current `transform.position` as `WorldPosition`
 * apply authoritative positions via `ApplyWorldPosition(...)`
 * enable or disable selection through `SetSelectable(...)`
-* expose or own a collider/hit target for pointer selection
+* expose or own one or more collider hit targets for pointer selection
 * accept spawned runtime initialization for id, position, and color
 * optionally apply a spawned-view-only visual scale multiplier so runtime holes can read as
   slightly smaller than their occupied board cells without changing authored footprint truth
@@ -166,7 +172,8 @@ Non-responsibilities:
 * do not inspect hole fill/capacity to decide rules
 * do not destroy itself when completed
 
-For MVP, `SetSelectable(false)` may simply disable a collider or set an internal selectable flag.
+For MVP, `SetSelectable(false)` may disable all configured selection colliders or set an internal
+selectable flag.
 
 ### `DropTheManStickmanView`
 
@@ -280,9 +287,9 @@ Reason:
 
 ### Future Alternatives
 
-The collectable source is now a dedicated prefab referenced by the shared prototype visual config.
-Hole selection still uses the current scene-controller prefab reference until shape-aware hole
-resolution is implemented.
+The collectable source and canonical hole prefab mappings are now referenced by the shared
+prototype visual config. Runtime hole selection derives presentation shape from the existing
+structural footprint and rejects missing or ambiguous mappings; content does not store prefab ids.
 
 ---
 
@@ -317,7 +324,7 @@ The hit-test should ignore views that are not selectable.
 
 For MVP, this can be implemented by:
 
-* disabling the collider in `SetSelectable(false)`
+* disabling all configured selection colliders in `SetSelectable(false)`
 * keeping a local `IsSelectable` property on the view
 * or both
 
@@ -591,13 +598,14 @@ The scene adapter should not duplicate outcome guarding; it should only stop fee
 Recommended MVP scene startup:
 
 ```text
-scene controller has one hole prefab and the bootstrapper has the shared visual config
+bootstrapper has the shared visual config with collectable prefab and canonical hole palette
     ->
 scene controller / dev bootstrapper discovers the configured Resources level catalog
     ->
 runtime model is built
     ->
-dev bootstrapper clones hole/collectable prefabs and assigns ids/colors/positions
+dev bootstrapper validates the complete palette, resolves each runtime footprint and rotation,
+then clones hole/collectable prefabs and assigns ids/colors/positions
     ->
 scene controller passes spawned view arrays to DropTheManRuntimeBootstrapper.CreateController(...)
     ->
@@ -636,8 +644,8 @@ Allowed minimal behavior:
 * timer may have no UI
 * terminal outcome may disable input and surface through a temporary `OnGUI` result window
 * startup failure may log a direct error
-* hole spawning may use the single scene-controller prefab reference until shape-aware resolution
-  exists
+* startup may log a direct footprint/palette configuration error rather than substituting the
+  wrong hole visual
 
 Deliberately not included:
 

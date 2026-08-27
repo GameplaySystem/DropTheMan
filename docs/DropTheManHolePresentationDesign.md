@@ -31,6 +31,13 @@ The configurable `DropTheManHolePresentation` component and corrected single-cel
 passed isolated Unity validation. The cap blend shape resolves by its authored name, the cap-close
 and shrink sequence plays, and reset restores the authored state.
 
+All eight canonical hole wrapper prefabs are now authored and referenced by the shared visual
+config. Runtime spawning resolves them from exact footprint sets across quarter-turn rotations.
+Owner validation confirmed that the eight unrotated canonical footprints spawn their distinct
+configured visuals rather than falling back to the single-hole view. Rotated variants, individual
+root alignment, every selection collider, sockets, cap blend shapes, stencil apertures, and
+completion sequences still require focused Unity validation.
+
 The direct callback is connected to `Full -> Closing -> Completed` gameplay orchestration. The
 configured path now waits for cap-close and shrink before finalization; placeholder or invalid
 presentation configurations use an immediate callback fallback so animation availability never
@@ -114,6 +121,10 @@ The stencil aperture must:
 * use the prototype stencil-writer material
 * remain visually invisible
 * avoid owning gameplay colliders
+
+Each prefab may use multiple selection colliders to approximate non-rectangular visual surfaces
+such as L, T, and plus shapes. These colliders are pointer hit targets only. Runtime footprint data
+remains authoritative for movement, overlap, occupancy, capacity, and board-boundary rules.
 
 The inner-cavity material should read the aperture's stencil reference with comparison `Equal`.
 Board receiver materials continue to use `NotEqual`. This keeps the interior visible through the
@@ -215,10 +226,12 @@ The isolated prefab and integrated runtime validation confirmed:
 * a full hole stops responding to pointer drag before the animation starts
 * the hole remains visible while `Closing`
 * `PresentationRoot` shrinks while the logical root and collider hierarchy remain stable
+* all configured selection colliders disable together when the hole stops being selectable
 * the completion callback finalizes the hole exactly once
 * the completed view is destroyed only after the callback
 * win routing occurs only after `Completed`
 * restarting or loading another level leaves no active tween or destroyed-reference errors
+* the eight canonical unrotated footprints resolve to eight distinct configured hole prefabs
 
 The remaining manual A/B check is presentation-only:
 
@@ -237,5 +250,7 @@ Automated or focused fallback-path coverage should still verify:
 
 * production receiver materials and complete URP auxiliary passes
 * cat falling animation and socket reservation
-* per-shape presentation offsets and all non-single hole prefabs
+* rotated-shape, root-alignment, collider, and completion validation for the seven non-single
+  prefabs
+* final cavity lighting policy; current sharp inner-wall self-shadows remain an art review item
 * audio, particles, haptics, and UI feedback
