@@ -27,8 +27,8 @@ namespace DropAwayPrototype.Editor
     }
 
     /// <summary>
-    /// Prototype-owned palette entry describing one hole authoring option.
-    /// This is editor data only and does not replace runtime payload definitions.
+    /// Prototype-owned visual palette entry shared by authoring previews and gameplay spawning.
+    /// This presentation mapping does not replace or extend runtime payload definitions.
     /// </summary>
     [Serializable]
     public sealed class DropTheManEditorHolePaletteEntry

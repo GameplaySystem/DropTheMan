@@ -455,16 +455,6 @@ namespace DropAwayPrototype.Runtime
             out DropTheManStickmanView[] runtimeStickmanViews,
             out string failureReason)
         {
-            DropTheManHoleView holePrefab = ResolveFirstPrefab(sceneController.HoleViewPrefabs);
-            if (holePrefab == null)
-            {
-                runtimeHoleViews = null;
-                runtimeStickmanViews = null;
-                failureReason =
-                    "Runtime spawning requires at least one hole view prefab on the scene controller.";
-                return false;
-            }
-
             if (visualConfig == null)
             {
                 runtimeHoleViews = null;
@@ -484,6 +474,16 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (!TryCreateHolePrefabDefinitions(
+                    visualConfig,
+                    out IReadOnlyList<DropTheManHolePrefabDefinition> holePrefabDefinitions,
+                    out failureReason))
+            {
+                runtimeHoleViews = null;
+                runtimeStickmanViews = null;
+                return false;
+            }
+
             Transform spawnRoot = runtimeViewSpawnRoot != null
                 ? runtimeViewSpawnRoot
                 : transform;
@@ -491,7 +491,7 @@ namespace DropAwayPrototype.Runtime
             return new DropTheManRuntimeLevelViewSpawner().TrySpawnViews(
                 runtimeModel,
                 worldLayout,
-                holePrefab,
+                holePrefabDefinitions,
                 collectablePrefab,
                 spawnRoot,
                 out runtimeHoleViews,
@@ -499,23 +499,69 @@ namespace DropAwayPrototype.Runtime
                 out failureReason);
         }
 
-        private static T ResolveFirstPrefab<T>(IReadOnlyList<T> prefabs)
-            where T : UnityEngine.Object
+        private static bool TryCreateHolePrefabDefinitions(
+            DropTheManEditorConfig config,
+            out IReadOnlyList<DropTheManHolePrefabDefinition> definitions,
+            out string failureReason)
         {
-            if (prefabs == null)
+            definitions = null;
+
+            if (config.holePaletteEntries == null ||
+                config.holePaletteEntries.Count == 0)
             {
-                return null;
+                failureReason =
+                    "Runtime spawning requires at least one hole palette entry in the " +
+                    "Drop The Man visual config.";
+                return false;
             }
 
-            for (int i = 0; i < prefabs.Count; i++)
+            List<DropTheManHolePrefabDefinition> resolvedDefinitions =
+                new(config.holePaletteEntries.Count);
+            for (int i = 0; i < config.holePaletteEntries.Count; i++)
             {
-                if (prefabs[i] != null)
+                DropTheManEditorHolePaletteEntry entry = config.holePaletteEntries[i];
+                if (entry == null)
                 {
-                    return prefabs[i];
+                    failureReason = $"Hole palette entry at index {i} is missing.";
+                    return false;
                 }
+
+                if (entry.previewPrefab == null)
+                {
+                    failureReason =
+                        $"Hole palette entry '{entry.id}' requires a preview prefab.";
+                    return false;
+                }
+
+                if (!entry.previewPrefab.TryGetComponent(out DropTheManHoleView holeView))
+                {
+                    failureReason =
+                        $"Hole palette prefab '{entry.previewPrefab.name}' for entry " +
+                        $"'{entry.id}' requires DropTheManHoleView on its root.";
+                    return false;
+                }
+
+                List<GridCoordinate> footprintOffsets = new();
+                if (entry.footprintOffsets != null)
+                {
+                    for (int offsetIndex = 0;
+                         offsetIndex < entry.footprintOffsets.Count;
+                         offsetIndex++)
+                    {
+                        Vector2Int offset = entry.footprintOffsets[offsetIndex];
+                        footprintOffsets.Add(new GridCoordinate(offset.x, offset.y));
+                    }
+                }
+
+                resolvedDefinitions.Add(new DropTheManHolePrefabDefinition(
+                    entry.id,
+                    holeView,
+                    footprintOffsets));
             }
 
-            return null;
+            definitions = resolvedDefinitions;
+            failureReason = string.Empty;
+            return true;
         }
 
         private IDropTheManLevelDefinitionProvider CreateLevelDefinitionProvider()
@@ -722,7 +768,7 @@ namespace DropAwayPrototype.Runtime
         public bool TrySpawnViews(
             DropTheManRuntimeModel runtimeModel,
             GridWorldLayout worldLayout,
-            DropTheManHoleView holePrefab,
+            IReadOnlyList<DropTheManHolePrefabDefinition> holePrefabDefinitions,
             DropTheManStickmanView collectablePrefab,
             Transform spawnRoot,
             out DropTheManHoleView[] spawnedHoleViews,
@@ -738,9 +784,11 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (holePrefab == null)
+            if (!DropTheManHolePrefabResolver.TryCreate(
+                    holePrefabDefinitions,
+                    out DropTheManHolePrefabResolver holePrefabResolver,
+                    out failureReason))
             {
-                failureReason = "A hole view prefab is required for runtime spawning.";
                 return false;
             }
 
@@ -748,6 +796,23 @@ namespace DropAwayPrototype.Runtime
             {
                 failureReason = "A collectable view prefab is required for runtime spawning.";
                 return false;
+            }
+
+            DropTheManHolePrefabResolution[] holePrefabResolutions =
+                new DropTheManHolePrefabResolution[runtimeModel.Holes.Count];
+            for (int i = 0; i < runtimeModel.Holes.Count; i++)
+            {
+                HoleRuntimeState hole = runtimeModel.Holes[i];
+                if (!holePrefabResolver.TryResolve(
+                        hole.Footprint.Offsets,
+                        out holePrefabResolutions[i],
+                        out string resolutionFailureReason))
+                {
+                    failureReason =
+                        $"Runtime hole '{hole.Id}' could not resolve a view prefab: " +
+                        resolutionFailureReason;
+                    return false;
+                }
             }
 
             Transform resolvedRoot = EnsureSpawnRoot(spawnRoot);
@@ -760,15 +825,20 @@ namespace DropAwayPrototype.Runtime
             for (int i = 0; i < runtimeModel.Holes.Count; i++)
             {
                 HoleRuntimeState hole = runtimeModel.Holes[i];
+                DropTheManHolePrefabResolution prefabResolution =
+                    holePrefabResolutions[i];
                 Vector3 worldPosition = ToWorldPosition(
                     worldLayout,
                     hole.CurrentCoordinate,
-                    holePrefab.transform.position.y);
+                    prefabResolution.Prefab.transform.position.y);
 
                 DropTheManHoleView holeView = UnityEngine.Object.Instantiate(
-                    holePrefab,
+                    prefabResolution.Prefab,
                     holesRoot);
                 holeView.name = $"Hole_{hole.Id}";
+                holeView.transform.rotation = BuildHoleRotation(
+                    worldLayout,
+                    prefabResolution.QuarterTurns);
                 holeView.ConfigureSpawnedView(hole.Id, worldPosition, hole.ColorIdentity);
                 spawnedHoleViews[i] = holeView;
             }
@@ -805,6 +875,17 @@ namespace DropAwayPrototype.Runtime
                 worldLayout.BoardLocalToWorld(new Vector2(coordinate.X, coordinate.Y));
             worldPosition.y = visualHeight;
             return worldPosition;
+        }
+
+        private static Quaternion BuildHoleRotation(
+            GridWorldLayout worldLayout,
+            int quarterTurns)
+        {
+            Vector3 boardNormal =
+                Vector3.Cross(worldLayout.BoardYAxis, worldLayout.BoardXAxis).normalized;
+            Quaternion boardRotation =
+                Quaternion.LookRotation(worldLayout.BoardYAxis, boardNormal);
+            return boardRotation * Quaternion.Euler(0f, quarterTurns * 90f, 0f);
         }
 
         private static Transform EnsureSpawnRoot(Transform spawnRoot)

@@ -1,6 +1,7 @@
 using System;
 using PuzzleFramework.Presentation;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace DropAwayPrototype.Runtime
 {
@@ -13,7 +14,9 @@ namespace DropAwayPrototype.Runtime
     public sealed class DropTheManHoleView : MonoBehaviour, IDropTheManHoleView
     {
         [SerializeField] private string runtimeId = string.Empty;
-        [SerializeField] private Collider selectionCollider;
+        [FormerlySerializedAs("selectionCollider")]
+        [SerializeField, HideInInspector] private Collider legacySelectionCollider;
+        [SerializeField] private Collider[] selectionColliders;
         [SerializeField] private bool isSelectable = true;
         [SerializeField] private bool preserveWorldYOnApply = true;
         [SerializeField] private bool hideRenderersWhenNotSelectable = true;
@@ -35,10 +38,7 @@ namespace DropAwayPrototype.Runtime
         {
             CapturePrefabScale();
 
-            if (selectionCollider == null)
-            {
-                TryGetComponent(out selectionCollider);
-            }
+            EnsureSelectionColliders();
 
             if (renderersToHideWhenNotSelectable == null || renderersToHideWhenNotSelectable.Length == 0)
             {
@@ -157,9 +157,14 @@ namespace DropAwayPrototype.Runtime
 
         private void ApplyInteractionState()
         {
-            if (selectionCollider != null)
+            EnsureSelectionColliders();
+
+            for (int i = 0; i < selectionColliders.Length; i++)
             {
-                selectionCollider.enabled = isSelectable;
+                if (selectionColliders[i] != null)
+                {
+                    selectionColliders[i].enabled = isSelectable;
+                }
             }
         }
 
@@ -167,10 +172,7 @@ namespace DropAwayPrototype.Runtime
         {
             CapturePrefabScale();
 
-            if (selectionCollider == null)
-            {
-                TryGetComponent(out selectionCollider);
-            }
+            EnsureSelectionColliders();
 
             if (renderersToHideWhenNotSelectable == null ||
                 renderersToHideWhenNotSelectable.Length == 0)
@@ -183,6 +185,40 @@ namespace DropAwayPrototype.Runtime
             {
                 TryGetComponent(out completionPresentation);
             }
+        }
+
+        private void EnsureSelectionColliders()
+        {
+            if (HasConfiguredSelectionCollider())
+            {
+                return;
+            }
+
+            if (legacySelectionCollider != null)
+            {
+                selectionColliders = new[] { legacySelectionCollider };
+                return;
+            }
+
+            selectionColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+        }
+
+        private bool HasConfiguredSelectionCollider()
+        {
+            if (selectionColliders == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < selectionColliders.Length; i++)
+            {
+                if (selectionColliders[i] != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void CapturePrefabScale()
