@@ -214,6 +214,7 @@ namespace DropAwayPrototype.Editor
                 DropTheManEditorPlacementMode.Obstacle => ToggleBlockedCell(coordinate),
                 DropTheManEditorPlacementMode.Stickman => PlaceStickman(coordinate),
                 DropTheManEditorPlacementMode.Hole => PlaceHole(coordinate),
+                DropTheManEditorPlacementMode.HoleRotation => RotateHoleAtOrContaining(coordinate),
                 _ => false
             };
         }
@@ -225,6 +226,7 @@ namespace DropAwayPrototype.Editor
                 DropTheManEditorPlacementMode.Obstacle => levelData.BlockedCells.Remove(coordinate),
                 DropTheManEditorPlacementMode.Stickman => RemoveStickmanAt(coordinate),
                 DropTheManEditorPlacementMode.Hole => RemoveHoleAtOrContaining(coordinate),
+                DropTheManEditorPlacementMode.HoleRotation => RemoveHoleAtOrContaining(coordinate),
                 _ => false
             };
         }
@@ -607,39 +609,17 @@ namespace DropAwayPrototype.Editor
 
         private void RebuildHoleVisuals(GridWorldLayout worldLayout)
         {
-            Quaternion boardRotation = BuildBoardRotation(worldLayout);
-
             for (int i = 0; i < levelData.Holes.Count; i++)
             {
                 DropTheManDevHoleData hole = levelData.Holes[i];
-                GameObject holeRoot = new($"Hole_{hole.Id}");
-                holeRoot.transform.SetParent(placementVisualRoot, worldPositionStays: false);
-                holeRoot.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-
-                IReadOnlyList<Vector2Int> footprintOffsets = ResolveFootprintOffsets(hole.FootprintOffsets);
-                for (int offsetIndex = 0; offsetIndex < footprintOffsets.Count; offsetIndex++)
+                if (TryCreateConcreteHolePreview(hole, worldLayout, out GameObject holePreview))
                 {
-                    Vector2Int cellCoordinate = hole.Coordinate + footprintOffsets[offsetIndex];
-                    GameObject footprintTile = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    footprintTile.name = $"Footprint_{offsetIndex}";
-                    footprintTile.transform.SetParent(holeRoot.transform, worldPositionStays: false);
-                    footprintTile.transform.SetPositionAndRotation(
-                        GetCellCenterWorld(worldLayout, cellCoordinate) +
-                        GetBoardNormal(worldLayout) * 0.08f,
-                        boardRotation);
-                    footprintTile.transform.localScale =
-                        new Vector3(cellSize.x * 0.72f, 0.06f, cellSize.y * 0.72f);
-
-                    Collider collider = footprintTile.GetComponent<Collider>();
-                    if (collider != null)
-                    {
-                        collider.enabled = false;
-                    }
+                    holePreview.name = $"Hole_{hole.Id}";
+                    holePreview.transform.SetParent(placementVisualRoot, worldPositionStays: true);
+                    continue;
                 }
 
-                ApplyColorToRenderers(
-                    holeRoot.GetComponentsInChildren<Renderer>(includeInactive: true),
-                    hole.ColorIdentity);
+                CreateFallbackHolePreview(hole, worldLayout);
             }
         }
 
@@ -770,9 +750,7 @@ namespace DropAwayPrototype.Editor
                 return false;
             }
 
-            List<Vector2Int> rotatedOffsets = RotateOffsets(
-                ResolveFootprintOffsets(paletteEntry.footprintOffsets),
-                selectedHoleQuarterTurns);
+            List<Vector2Int> rotatedOffsets = ResolveFootprintOffsets(paletteEntry.footprintOffsets);
 
             DropTheManDevHoleData existingOriginHole = FindHoleByOrigin(coordinate);
             if (!CanPlaceHole(coordinate, rotatedOffsets, existingOriginHole))
@@ -795,6 +773,26 @@ namespace DropAwayPrototype.Editor
                     ColorIdentity = NormalizeColorIdentity(selectedColor),
                     FootprintOffsets = rotatedOffsets
                 });
+            return true;
+        }
+
+        private bool RotateHoleAtOrContaining(Vector2Int coordinate)
+        {
+            DropTheManDevHoleData hole = FindHoleContaining(coordinate);
+            if (hole == null)
+            {
+                return false;
+            }
+
+            List<Vector2Int> rotatedOffsets = RotateOffsets(
+                ResolveFootprintOffsets(hole.FootprintOffsets),
+                1);
+            if (!CanPlaceHole(hole.Coordinate, rotatedOffsets, hole))
+            {
+                return false;
+            }
+
+            hole.FootprintOffsets = rotatedOffsets;
             return true;
         }
 
@@ -994,10 +992,27 @@ namespace DropAwayPrototype.Editor
                 new Vector2(coordinate.x, coordinate.y));
         }
 
+        private Vector3 BuildHoleWorldPosition(
+            GridWorldLayout worldLayout,
+            Vector2Int coordinate,
+            float visualHeight)
+        {
+            Vector3 worldPosition = GetCellCenterWorld(worldLayout, coordinate);
+            worldPosition.y = visualHeight;
+            return worldPosition;
+        }
+
         private static Quaternion BuildBoardRotation(GridWorldLayout worldLayout)
         {
             Vector3 normal = GetBoardNormal(worldLayout);
             return Quaternion.LookRotation(worldLayout.BoardYAxis, normal);
+        }
+
+        private static Quaternion BuildHoleRotation(
+            GridWorldLayout worldLayout,
+            int quarterTurns)
+        {
+            return BuildBoardRotation(worldLayout) * Quaternion.Euler(0f, quarterTurns * 90f, 0f);
         }
 
         private static Vector3 GetBoardNormal(GridWorldLayout worldLayout)
@@ -1008,6 +1023,32 @@ namespace DropAwayPrototype.Editor
         private static bool IsDarkCheckerCell(Vector2Int coordinate)
         {
             return ((coordinate.x + coordinate.y) & 1) == 1;
+        }
+
+        private static bool OffsetSetsMatch(
+            IReadOnlyList<Vector2Int> left,
+            IReadOnlyList<Vector2Int> right)
+        {
+            if (left == null || right == null || left.Count != right.Count)
+            {
+                return false;
+            }
+
+            HashSet<Vector2Int> rightOffsets = new();
+            for (int i = 0; i < right.Count; i++)
+            {
+                rightOffsets.Add(right[i]);
+            }
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!rightOffsets.Contains(left[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private Material ResolveColorMaterial(ColorIdentity colorIdentity)
@@ -1035,6 +1076,122 @@ namespace DropAwayPrototype.Editor
                 0,
                 config.holePaletteEntries.Count - 1);
             return config.holePaletteEntries[selectedHolePaletteIndex];
+        }
+
+        private bool TryCreateConcreteHolePreview(
+            DropTheManDevHoleData hole,
+            GridWorldLayout worldLayout,
+            out GameObject holePreview)
+        {
+            holePreview = null;
+
+            if (!TryResolveHolePaletteEntryForAuthoredHole(
+                    hole,
+                    out DropTheManEditorHolePaletteEntry paletteEntry,
+                    out int quarterTurns))
+            {
+                return false;
+            }
+
+            if (paletteEntry.previewPrefab == null)
+            {
+                Debug.LogWarning(
+                    $"Drop The Man editor hole palette entry '{paletteEntry.id}' is missing a preview prefab.",
+                    this);
+                return false;
+            }
+
+            holePreview = Instantiate(paletteEntry.previewPrefab);
+            holePreview.transform.SetPositionAndRotation(
+                BuildHoleWorldPosition(
+                    worldLayout,
+                    hole.Coordinate,
+                    paletteEntry.previewPrefab.transform.position.y),
+                BuildHoleRotation(worldLayout, quarterTurns));
+            DropTheManViewPresentationUtility.ApplyColor(
+                holePreview.GetComponentsInChildren<Renderer>(includeInactive: true),
+                hole.ColorIdentity);
+            return true;
+        }
+
+        private void CreateFallbackHolePreview(
+            DropTheManDevHoleData hole,
+            GridWorldLayout worldLayout)
+        {
+            Quaternion boardRotation = BuildBoardRotation(worldLayout);
+            GameObject holeRoot = new($"Hole_{hole.Id}");
+            holeRoot.transform.SetParent(placementVisualRoot, worldPositionStays: false);
+            holeRoot.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+            IReadOnlyList<Vector2Int> footprintOffsets = ResolveFootprintOffsets(hole.FootprintOffsets);
+            for (int offsetIndex = 0; offsetIndex < footprintOffsets.Count; offsetIndex++)
+            {
+                Vector2Int cellCoordinate = hole.Coordinate + footprintOffsets[offsetIndex];
+                GameObject footprintTile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                footprintTile.name = $"Footprint_{offsetIndex}";
+                footprintTile.transform.SetParent(holeRoot.transform, worldPositionStays: false);
+                footprintTile.transform.SetPositionAndRotation(
+                    GetCellCenterWorld(worldLayout, cellCoordinate) +
+                    GetBoardNormal(worldLayout) * 0.08f,
+                    boardRotation);
+                footprintTile.transform.localScale =
+                    new Vector3(cellSize.x * 0.72f, 0.06f, cellSize.y * 0.72f);
+
+                Collider collider = footprintTile.GetComponent<Collider>();
+                if (collider != null)
+                {
+                    collider.enabled = false;
+                }
+            }
+
+            ApplyColorToRenderers(
+                holeRoot.GetComponentsInChildren<Renderer>(includeInactive: true),
+                hole.ColorIdentity);
+        }
+
+        private bool TryResolveHolePaletteEntryForAuthoredHole(
+            DropTheManDevHoleData hole,
+            out DropTheManEditorHolePaletteEntry paletteEntry,
+            out int quarterTurns)
+        {
+            paletteEntry = null;
+            quarterTurns = 0;
+
+            if (hole == null || config == null || config.holePaletteEntries == null)
+            {
+                return false;
+            }
+
+            List<Vector2Int> authoredOffsets = ResolveFootprintOffsets(hole.FootprintOffsets);
+            for (int entryIndex = 0; entryIndex < config.holePaletteEntries.Count; entryIndex++)
+            {
+                DropTheManEditorHolePaletteEntry candidate = config.holePaletteEntries[entryIndex];
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                List<Vector2Int> candidateOffsets =
+                    ResolveFootprintOffsets(candidate.footprintOffsets);
+                for (int candidateQuarterTurns = 0; candidateQuarterTurns < 4; candidateQuarterTurns++)
+                {
+                    if (!OffsetSetsMatch(
+                            RotateOffsets(candidateOffsets, candidateQuarterTurns),
+                            authoredOffsets))
+                    {
+                        continue;
+                    }
+
+                    paletteEntry = candidate;
+                    quarterTurns = candidateQuarterTurns;
+                    return true;
+                }
+            }
+
+            Debug.LogWarning(
+                $"Drop The Man editor could not resolve a concrete hole preview for '{hole.Id}'. Falling back to footprint blocks.",
+                this);
+            return false;
         }
 
         private static List<Vector2Int> ResolveFootprintOffsets(IReadOnlyList<Vector2Int> sourceOffsets)

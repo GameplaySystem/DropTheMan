@@ -4,6 +4,7 @@ namespace DropAwayPrototype.Editor
     {
         Obstacle = 0,
         Stickman = 1,
-        Hole = 2
+        Hole = 2,
+        HoleRotation = 3
     }
 }

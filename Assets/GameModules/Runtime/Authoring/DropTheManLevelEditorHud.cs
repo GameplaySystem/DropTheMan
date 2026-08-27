@@ -107,7 +107,7 @@ namespace DropAwayPrototype.Editor
             GUILayout.Label(
                 $"Hole palette: {_boardController.ResolveSelectedHolePaletteDisplayName()} ({_boardController.ResolveHolePaletteEntryCount()} configured)");
             GUILayout.Label(
-                $"Rotation: {_boardController.SelectedHoleRotationDegrees} deg    Holes: {levelData.Holes.Count}    Stickmen: {levelData.Stickmen.Count}");
+                $"Holes: {levelData.Holes.Count}    Stickmen: {levelData.Stickmen.Count}");
             GUILayout.Space(8f);
 
             GUILayout.Label("Level Id");
@@ -148,8 +148,8 @@ namespace DropAwayPrototype.Editor
             GUILayout.EndHorizontal();
 
             GUILayout.Space(8f);
-            GUILayout.Label("Hotkeys: O obstacle, M stickman, H hole, R rotate, 0-9 color");
-            GUILayout.Label("Mouse: Left place, Right erase, Wheel cycle hole palette");
+            GUILayout.Label("Hotkeys: O obstacle, M stickman, H hole place, R hole rotate, 0-9 color");
+            GUILayout.Label("Mouse: Left act, Right erase, Wheel cycle hole palette in hole mode");
             GUILayout.Label("This scene authors level data only. Gameplay play/test is separate.");
 
             GUILayout.Space(8f);

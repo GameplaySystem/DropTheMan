@@ -118,10 +118,9 @@ namespace DropAwayPrototype.Editor
                 boardController.SetPlacementMode(DropTheManEditorPlacementMode.Hole);
             }
 
-            if (boardController.CurrentMode == DropTheManEditorPlacementMode.Hole &&
-                WasKeyPressed(KeyCode.R))
+            if (WasKeyPressed(KeyCode.R))
             {
-                boardController.RotateSelectedHoleClockwise();
+                boardController.SetPlacementMode(DropTheManEditorPlacementMode.HoleRotation);
             }
 
             if (TryGetPressedColorSlot(out ColorIdentity colorIdentity))

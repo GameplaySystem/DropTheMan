@@ -237,12 +237,14 @@ The intended authoring modes are:
 
 * stickman placement mode
 * hole placement mode
+* hole rotation mode
 * obstacle mode
 
 Current interpretation:
 
 * stickman placement mode authors single-cell stickmen
-* hole placement mode authors hole entries using the selected palette footprint and rotation
+* hole placement mode authors hole entries using the selected palette footprint in its canonical orientation
+* hole rotation mode rotates an already placed hole clockwise when the author clicks any cell used by that hole
 * obstacle mode paints blocked cells
 
 Obstacle mode does not create separate obstacle entities in this slice.
@@ -255,10 +257,10 @@ The planned hotkeys are:
 
 * `M` = stickman placement mode
 * `H` = hole placement mode
+* `R` = hole rotation mode
 * `O` = obstacle mode
 * `0` through `9` = select shared color slot
 * mouse scroll = cycle configured hole palette entries
-* `R` = rotate the currently selected hole footprint
 
 Hotkey meaning remains prototype-owned editor behavior, not framework runtime input behavior.
 
@@ -312,6 +314,9 @@ Each palette entry should be able to describe:
 * footprint offsets
 * default or current color identity
 * optional preview prefab
+
+Placed holes in the authoring scene should use the configured concrete preview prefab when one is
+available instead of rebuilding the footprint from square placeholder tiles.
 
 The palette is data-driven through a prototype-owned config asset.
 
@@ -469,11 +474,15 @@ Phase 2 should implement:
 * a runtime play-mode input controller
 * a lightweight runtime HUD or debug UI for current mode, color, and authored fields
 * `O`, `M`, and `H` placement modes in Play mode
+* `R` hole rotation mode in Play mode
 * `0` through `9` shared color-slot selection in Play mode
 * obstacle mode blocked-cell painting in Play mode
 * stickman placement using selected color identity and stable unique ids
-* hole placement using selected color identity, configured palette footprints, mouse-scroll
-  palette cycling, editor-only `R` rotation, and footprint overlap rejection
+* hole placement using selected color identity, configured palette footprints in their canonical
+  orientation, mouse-scroll palette cycling, concrete hole preview prefabs when available, and
+  footprint overlap rejection
+* click-to-rotate of already placed holes with the same structural bounds and overlap validation
+  used by placement
 * small right-click erase behavior
 
 Phase 2 still should not implement:
@@ -610,7 +619,8 @@ Phase 2 adds:
 * runtime hotkey-driven mode and color selection
 * blocked-cell painting in Play mode
 * stickman placement
-* footprint-aware hole placement with palette cycling and editor-only rotation
+* footprint-aware hole placement with palette cycling and concrete hole previews
+* a separate click-to-rotate mode for already placed holes
 * lightweight runtime HUD/debug UI
 * lightweight right-click erasing
 

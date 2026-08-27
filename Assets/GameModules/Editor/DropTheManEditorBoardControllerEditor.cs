@@ -91,7 +91,7 @@ namespace DropAwayPrototype.Editor
                 EditorStyles.label);
             GUI.Label(
                 new Rect(panelRect.x + 10f, panelRect.y + 62f, panelRect.width - 20f, 18f),
-                $"Hole palette: {Controller.ResolveSelectedHolePaletteDisplayName()}    Rotation: {Controller.SelectedHoleQuarterTurns * 90} deg",
+                $"Hole palette: {Controller.ResolveSelectedHolePaletteDisplayName()}",
                 EditorStyles.label);
 
             Handles.EndGUI();
@@ -128,12 +128,10 @@ namespace DropAwayPrototype.Editor
                 return true;
             }
 
-            if (currentEvent.keyCode == KeyCode.R &&
-                Controller.CurrentMode == DropTheManEditorPlacementMode.Hole)
+            if (currentEvent.keyCode == KeyCode.R)
             {
-                Undo.RecordObject(Controller, "Drop The Man Editor Rotate Hole");
-                Controller.RotateSelectedHoleClockwise();
-                Controller.RefreshVisuals();
+                Undo.RecordObject(Controller, "Drop The Man Editor Mode");
+                Controller.SetPlacementMode(DropTheManEditorPlacementMode.HoleRotation);
                 currentEvent.Use();
                 return true;
             }
