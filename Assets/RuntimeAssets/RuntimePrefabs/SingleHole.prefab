@@ -138,7 +138,9 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManHoleView
   runtimeId:
-  selectionCollider: {fileID: 1051750550175839310}
+  legacySelectionCollider: {fileID: 1051750550175839310}
+  selectionColliders:
+  - {fileID: 1051750550175839310}
   isSelectable: 1
   preserveWorldYOnApply: 1
   hideRenderersWhenNotSelectable: 1

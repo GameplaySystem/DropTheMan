@@ -15,13 +15,73 @@ MonoBehaviour:
   defaultBoardWidth: 7
   defaultBoardHeight: 8
   editorCellPrefab: {fileID: 135422902841736654, guid: 5c84238caef74744b89f15e81b4efd80, type: 3}
-  collectableViewPrefab: {fileID: 0}
+  collectableViewPrefab: {fileID: 5904404784402140045, guid: aefb31743e0b76e488f1dd47c2c8d11d, type: 3}
   blockedCellMaterial: {fileID: 0}
   colorSlotMaterials: []
   holePaletteEntries:
   - id: hole_single
-    displayName: Single Cell
+    displayName: Single Hole
     defaultColorIdentity: 1
     previewPrefab: {fileID: 4392594651091996551, guid: b35cae307b38d25408a3b3626d6bfb16, type: 3}
     footprintOffsets:
     - {x: 0, y: 0}
+  - id: hole_double
+    displayName: Double Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 1041359408516656629, guid: 0753395e52c670748a074de0c55afba4, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+  - id: hole_triple
+    displayName: Triple Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 1935998177339381144, guid: 9ec02c3b8abfaf24ebd645b4c91c1dc6, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 0, y: 2}
+  - id: hole_short_L
+    displayName: Short L Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 1513459554616114710, guid: 961acd857a8913542a92a20b678d0964, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 0, y: -1}
+  - id: hole_long_L
+    displayName: Long L Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 8994105870047429768, guid: 74d71e590366f194b8ffde55f3e9a06b, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 1, y: 0}
+    - {x: 0, y: -1}
+    - {x: 0, y: -2}
+  - id: square_hole
+    displayName: Square Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 2099807149125470743, guid: 1401468ea1eceeb478c305a26f67cf60, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: 1, y: 0}
+    - {x: 1, y: 1}
+  - id: t_hole
+    displayName: T Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 8575715897421814210, guid: 30ac5eeb10e85264bb0ea6771c55055d, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: -1, y: 0}
+    - {x: 1, y: 0}
+  - id: plus_hole
+    displayName: Plus Hole
+    defaultColorIdentity: 1
+    previewPrefab: {fileID: 1947668823669666177, guid: 789b5a8e3a7b44545bb13b3e627862d2, type: 3}
+    footprintOffsets:
+    - {x: 0, y: 0}
+    - {x: 0, y: 1}
+    - {x: -1, y: 0}
+    - {x: 1, y: 0}
+    - {x: 0, y: -1}
