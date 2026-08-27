@@ -463,7 +463,7 @@ MonoBehaviour:
   pointerInputAdapter: {fileID: 1823423592}
   startGameplayOnInitialize: 1
   tickTimerInUpdate: 1
-  collectionTriggerRadiusInCells: 0.35
+  collectionTriggerRadiusInCells: 0.5
   dragClearanceInsetCells: 0.08
   snapFullHolesToNearestCellBeforeClosing: 1
 --- !u!1 &1823423590
