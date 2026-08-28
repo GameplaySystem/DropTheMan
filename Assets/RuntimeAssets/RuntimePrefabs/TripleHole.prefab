@@ -79,9 +79,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 68fa6995c7e94effb91f132f928222f6, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManHoleView
-  runtimeId:
+  runtimeId: 
   legacySelectionCollider: {fileID: 1890319344330718411}
   selectionColliders:
   - {fileID: 1890319344330718411}
@@ -102,7 +102,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c29072d2efb24673b1a16e3bb82c99ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManHolePresentation
   presentationRoot: {fileID: 5136428836979769844}
   capRenderer: {fileID: 7895476682372855304}
@@ -317,7 +317,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -7511558181221131132, guid: 67deec7b83db5694fa90277156b0d076, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: 4fe7cbd0925f48c59e42be2f2cf4f311, type: 2}
     - target: {fileID: -7278420214652187604, guid: 67deec7b83db5694fa90277156b0d076, type: 3}
       propertyPath: m_Layer
@@ -361,11 +361,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6263239871079775777, guid: 67deec7b83db5694fa90277156b0d076, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: b705d1f1f0184516aeab103f56e63a14, type: 2}
     - target: {fileID: 8973952349993674535, guid: 67deec7b83db5694fa90277156b0d076, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.11
+      value: 0.12
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

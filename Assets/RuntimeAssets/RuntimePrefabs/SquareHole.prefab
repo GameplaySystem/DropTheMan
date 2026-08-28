@@ -80,7 +80,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c29072d2efb24673b1a16e3bb82c99ff, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManHolePresentation
   presentationRoot: {fileID: 7423548270037424980}
   capRenderer: {fileID: 5089361447905719683}
@@ -109,9 +109,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 68fa6995c7e94effb91f132f928222f6, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManHoleView
-  runtimeId:
+  runtimeId: 
   legacySelectionCollider: {fileID: 805325507475137545}
   selectionColliders:
   - {fileID: 805325507475137545}
@@ -350,15 +350,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8101402554629276527, guid: 19bf516552b41854dacc66f9ddadf505, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: b705d1f1f0184516aeab103f56e63a14, type: 2}
     - target: {fileID: -7511558181221131132, guid: 19bf516552b41854dacc66f9ddadf505, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
-      value:
+      value: 
       objectReference: {fileID: 2100000, guid: 4fe7cbd0925f48c59e42be2f2cf4f311, type: 2}
     - target: {fileID: -6999370996383295098, guid: 19bf516552b41854dacc66f9ddadf505, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.11
+      value: 0.12
       objectReference: {fileID: 0}
     - target: {fileID: -6591533258854271965, guid: 19bf516552b41854dacc66f9ddadf505, type: 3}
       propertyPath: m_DirtyAABB
