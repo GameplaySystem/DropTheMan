@@ -31,6 +31,9 @@ namespace DropAwayPrototype.Runtime
         private bool _inputEnabled;
 
         public DropTheManRuntimeController RuntimeController => _runtimeController;
+        internal Camera InputCamera => pointerInputAdapter != null
+            ? pointerInputAdapter.InputCamera
+            : null;
         public bool IsInitialized => _isInitialized;
         public bool HasActiveRuntimeDrag =>
             _runtimeController != null && _runtimeController.HasActiveDrag;

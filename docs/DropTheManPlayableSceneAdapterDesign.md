@@ -415,6 +415,26 @@ Visual object height should be preserved by the view/adapter layer when needed. 
 
 ---
 
+## Dynamic Camera Positioning
+
+After a level's `GridWorldLayout` and logical board dimensions are available, the gameplay scene
+bootstrapper should reposition the explicitly configured perspective camera to frame the board.
+
+The framing calculation should:
+
+* use all four corners of the complete logical rectangular board bounds
+* account for camera aspect ratio and vertical field of view
+* preserve the authored camera rotation, field of view, and projection settings
+* move only along the camera's current forward axis while targeting the logical board center
+* include configurable framing padding
+* rerun on initial load, restart, and next-level load
+
+Blocked cells and participating-cell shape must not affect camera centering or distance. Camera
+positioning remains scene presentation and must not enter runtime gameplay services or framework
+board state.
+
+---
+
 ## Input Sample Policy
 
 The adapter must call:
@@ -603,6 +623,8 @@ bootstrapper has the shared visual config with collectable prefab and canonical 
 scene controller / dev bootstrapper discovers the configured Resources level catalog
     ->
 runtime model is built
+    ->
+gameplay camera is repositioned from the logical board bounds
     ->
 dev bootstrapper validates the complete palette, resolves each runtime footprint and rotation,
 then clones hole/collectable prefabs and assigns ids/colors/positions

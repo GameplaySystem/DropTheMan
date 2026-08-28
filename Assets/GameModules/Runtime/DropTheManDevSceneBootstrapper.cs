@@ -35,6 +35,9 @@ namespace DropAwayPrototype.Runtime
         [SerializeField] private Vector3 boardGridYAxis = Vector3.forward;
         [SerializeField] private DropTheManEditorConfig visualConfig;
         [SerializeField] private Transform runtimeViewSpawnRoot;
+        [Header("Camera Framing")]
+        [SerializeField, Min(1f)] private float cameraFramingPadding = 1.15f;
+        [SerializeField, Min(0.01f)] private float minimumCameraDistance = 1f;
         [Header("Generated Board Visuals")]
         [SerializeField] private ModularBoardCellView boardCellVisualPrefab;
         [SerializeField] private Transform boardVisualSpawnRoot;
@@ -316,6 +319,11 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            PositionGameplayCamera(
+                worldLayout,
+                frameworkBuildResult.Context.BoardData.Width,
+                frameworkBuildResult.Context.BoardData.Height);
+
             if (!TryRebuildBoardVisuals(
                     frameworkBuildResult.Context.BoardData,
                     worldLayout,
@@ -388,6 +396,29 @@ namespace DropAwayPrototype.Runtime
                     timerSystem);
             failureReason = initializeResult.FailureReason;
             return initializeResult;
+        }
+
+        private void PositionGameplayCamera(
+            GridWorldLayout worldLayout,
+            int boardWidth,
+            int boardHeight)
+        {
+            Camera targetCamera = sceneController != null
+                ? sceneController.InputCamera
+                : null;
+            if (!DropTheManBoardCameraPositioner.TryPositionCamera(
+                    targetCamera,
+                    worldLayout,
+                    boardWidth,
+                    boardHeight,
+                    cameraFramingPadding,
+                    minimumCameraDistance,
+                    out string failureReason))
+            {
+                Debug.LogWarning(
+                    $"Drop The Man gameplay camera was not repositioned: {failureReason}",
+                    this);
+            }
         }
 
         private bool TryRebuildBoardVisuals(

@@ -152,6 +152,25 @@ authoring assumptions:
 
 ---
 
+## Dynamic Camera Positioning
+
+The dedicated authoring scene should reposition its configured perspective camera whenever the
+logical board dimensions change.
+
+Approved framing rule:
+
+* use the complete logical rectangular board bounds, including the visible extents of edge cells
+* fit both board width and board height against the camera's current aspect ratio and field of view
+* preserve the camera's authored rotation, field of view, and projection settings
+* move only the camera position along its existing forward axis while centering the logical board
+* apply configurable framing padding so presentation can keep clear space around the board
+* do not use blocked cells, holes, or stickmen to calculate the framing center
+
+This remains prototype-owned authoring presentation. It must not become editor content data or
+framework gameplay state.
+
+---
+
 ## Primary Workflow
 
 The intended `Drop The Man` level editor workflow is a dedicated authoring scene:
@@ -469,6 +488,7 @@ Phase 2 should implement:
 * visible board generation using the configured XZ board convention
 * default `5 x 5` board visualization with authored width and height
 * regeneration when board size changes
+* camera repositioning when board size changes without changing authored camera rotation
 * preservation of in-bounds authored content during resize
 * removal and warning logs for out-of-bounds blocked cells, stickmen, and holes during resize
 * a runtime play-mode input controller

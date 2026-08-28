@@ -30,6 +30,8 @@ namespace DropAwayPrototype.Editor
             {
                 worldCamera = Camera.main;
             }
+
+            boardController?.SetFramingCamera(worldCamera);
         }
 
         private void Awake()
@@ -81,6 +83,8 @@ namespace DropAwayPrototype.Editor
                     ? Camera.main
                     : FindFirstObjectByType<Camera>();
             }
+
+            boardController?.SetFramingCamera(worldCamera);
 
             EnsureHud();
         }

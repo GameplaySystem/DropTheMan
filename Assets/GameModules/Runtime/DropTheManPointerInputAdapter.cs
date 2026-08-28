@@ -29,6 +29,7 @@ namespace DropAwayPrototype.Runtime
         private DropTheManHoleView _activeHoleView;
 
         public bool IsDragging => _isDragging;
+        internal Camera InputCamera => inputCamera;
 
         private void Awake()
         {

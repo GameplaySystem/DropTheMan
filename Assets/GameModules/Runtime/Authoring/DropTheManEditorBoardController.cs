@@ -46,6 +46,10 @@ namespace DropAwayPrototype.Editor
         [SerializeField, Range(0, 3)] private int selectedHoleQuarterTurns;
         [SerializeField] private bool captureSceneInputWhenSelected = true;
         [SerializeField] private bool showSceneOverlay = true;
+        [Header("Camera Framing")]
+        [SerializeField] private Camera framingCamera;
+        [SerializeField, Min(1f)] private float cameraFramingPadding = 1.15f;
+        [SerializeField, Min(0.01f)] private float minimumCameraDistance = 1f;
         [SerializeField, HideInInspector] private Transform boardVisualRoot;
         [SerializeField, HideInInspector] private Transform placementVisualRoot;
 
@@ -128,6 +132,12 @@ namespace DropAwayPrototype.Editor
             EnsureVisualRoots();
             RebuildBoardVisuals(worldLayout);
             RebuildPlacementVisuals(worldLayout);
+            PositionEditorCamera(worldLayout);
+        }
+
+        internal void SetFramingCamera(Camera targetCamera)
+        {
+            framingCamera = targetCamera;
         }
 
         public void SetPlacementMode(DropTheManEditorPlacementMode mode)
@@ -990,6 +1000,31 @@ namespace DropAwayPrototype.Editor
         {
             return worldLayout.BoardLocalToWorld(
                 new Vector2(coordinate.x, coordinate.y));
+        }
+
+        private void PositionEditorCamera(GridWorldLayout worldLayout)
+        {
+            Camera targetCamera = framingCamera != null
+                ? framingCamera
+                : Camera.main;
+            if (targetCamera == null)
+            {
+                return;
+            }
+
+            if (!DropTheManBoardCameraPositioner.TryPositionCamera(
+                    targetCamera,
+                    worldLayout,
+                    levelData.BoardWidth,
+                    levelData.BoardHeight,
+                    cameraFramingPadding,
+                    minimumCameraDistance,
+                    out string failureReason))
+            {
+                Debug.LogWarning(
+                    $"Drop The Man editor camera was not repositioned: {failureReason}",
+                    this);
+            }
         }
 
         private Vector3 BuildHoleWorldPosition(
