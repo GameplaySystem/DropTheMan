@@ -215,7 +215,9 @@ Collecting -> Collected / Removed
 reserved slot becomes one filled slot
 ```
 
-The first playable placeholder completes presentation synchronously after hiding the stickman. Real animation may make that completion asynchronous later, but it must not decide whether reservation was valid.
+The concrete cat view completes presentation asynchronously after rising toward its assigned hole
+socket, falling below the moving socket, and shrinking out of view. Missing or invalid presentation
+uses the original synchronous hide fallback. Neither path decides whether reservation was valid.
 
 ---
 
@@ -428,7 +430,7 @@ For each accepted drag update:
    * reserved, collecting, or removed collectible is ignored for blocking
 7. Apply accepted reservations immediately.
 8. At the authoritative accepted position, trigger reserved collectibles within the configured threshold.
-9. After each triggered placeholder presentation completes, fill capacity.
+9. After each triggered collection presentation completes, fill capacity.
 10. If fill count reaches capacity, stop dragging and begin hole completion flow.
 11. If the sweep encounters a blocker, stop at the last valid accepted position before the blocker.
 

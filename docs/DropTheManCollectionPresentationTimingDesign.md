@@ -14,13 +14,12 @@ The stickman keeps falling until it disappears.
 Then hole capacity and full-hole completion continue.
 ```
 
-This is design only.
+The reservation and threshold timing described here are implemented. The current implementation
+slice advances the collection presentation from the synchronous hide placeholder to a concrete
+prototype-owned Animator and DOTween sequence.
 
-It does not implement:
+This design does not add:
 
-* animation
-* DOTween or Animator behavior
-* prefab spawning
 * event bus behavior
 * framework redesign
 * `TimerMode.CountUp`
@@ -28,9 +27,9 @@ It does not implement:
 
 ---
 
-## Current Documented Rule
+## Historical MVP Rule
 
-The current approved MVP rules say:
+The original synchronous MVP proof used:
 
 ```text
 same-color target cell entered or overlapped
@@ -50,11 +49,12 @@ That rule is documented in:
 * `DropTheManMVPRules.md`
 * `CRITICAL_RULE_CLARIFICATIONS.md`
 
-The current runtime follows that rule.
+The reservation/threshold implementation supersedes that immediate-fill rule. Current gameplay
+reserves capacity first and fills it only on collection presentation completion.
 
-The first playable scene placeholder then hides the stickman immediately when `OnCollectionStarted(...)` is called.
-
-That proves the gameplay chain, but it does not match the desired final visual target.
+The first playable scene originally hid the stickman immediately when collection started. The
+concrete cat presentation now delays capacity fill until its movement and disappearance sequence
+reports completion.
 
 ---
 
@@ -527,35 +527,111 @@ Do not silently leave both models active in source-of-truth docs.
 
 ---
 
-## Smallest Implementation Slice After Approval
+## Historical Foundation Slice
 
-Implement only:
+The first approved implementation established:
 
 * add `Reserved` to `StickmanLifecycleState`
 * add reservation methods/results to stickman runtime/index logic
 * add reserved capacity slot accounting for holes or collection sessions
 * change swept same-color handling from immediate fill to reservation
 * add threshold evaluation using `GridWorldLayout` and live authoritative hole position
-* make current placeholder hide fire only when threshold is reached
-* complete placeholder presentation synchronously
-* fill capacity and trigger full-hole completion after placeholder completion
+* placeholder hide firing only when threshold is reached
+* synchronous placeholder completion
+* capacity fill and full-hole completion after placeholder completion
 
-Do not add:
+That foundation intentionally deferred:
 
 * real falling animation
 * DOTween or Animator behavior
-* scene object destruction polish
 * event bus behavior
 * framework APIs
 * schema changes
+
+The concrete cat presentation below is the approved follow-up that replaces the synchronous
+placeholder when valid presentation assets are configured.
+
+---
+
+## Concrete Cat Presentation Contract
+
+When a reserved cat reaches the visual collection threshold:
+
+1. Runtime changes the cat to `Collecting` and requests presentation for its already-assigned hole.
+2. The hole presentation assigns the closest unclaimed authored collection socket. Socket choice
+   is deterministic by prefab array order when distances are equal.
+3. When its view is spawned, each cat receives one persistent falling-animation assignment from a
+   presentation-owned shared shuffle bag. This randomizes assignment while distributing every
+   valid configured variant before any variant repeats across cats in the level. On collection,
+   the cat disables collection colliders and starts its preassigned non-looping variant.
+   The September 2 artist delivery in `Cat.fbx` is the canonical rendered model, owns the Generic
+   Avatar, and supplies `Idle_1` and `Jump_1` through `Jump_6`. Axis conversion remains enabled.
+   Its bone rest transforms and mesh binding differ from the obsolete `Cat_3D.fbx`; matching bone
+   names alone does not make those two rigs interchangeable. Both imported Idle takes loop; Jump takes do
+   not. `Idle_1` is the controller default. The cat-model root owns the Animator. Idle
+   and collection remain controller-driven; collection immediately plays the preassigned `Fall_1`
+   through `Fall_6` state from normalized time zero, whose motion references the corresponding
+   artist-authored Jump take. Variant count follows the configured clip array rather than a
+   hard-coded three-clip limit. The setup pipeline must not generate rebased animation copies or
+   move the Animator above the model root.
+4. The cat rises while moving from its current world position toward a point above the socket.
+5. The cat then descends from above the socket to a configured depth below it while shrinking.
+6. Both motion phases evaluate the socket transform every tween update. A hole that continues
+   moving therefore carries the target path with it rather than leaving the cat aimed at a stale
+   world position.
+7. The cat hides or destroys its spawned view and invokes one completion callback.
+8. Runtime converts the reserved capacity slot into fill. If the hole is now full, hole completion
+   presentation begins.
+
+Socket claims last for the lifetime of the hole presentation. They are presentation bookkeeping,
+not capacity authority. The runtime reservation remains the source of truth.
+
+If the assigned hole view, socket, Animator, falling clip, or tween configuration is missing or
+invalid, the view logs the presentation problem, applies the immediate hide fallback, and invokes
+the same completion callback. Presentation failure must not strand a cat in `Collecting`.
+
+Collection completion resolves the assigned hole from `ReservedHoleId`; it must not require the
+hole to remain in the active drag session. This allows the player to release the hole while a cat
+is still moving and allows the live hole transform to continue being the presentation target.
+
+---
+
+## Animation Asset Maintenance
+
+The September 2 cleanup removes the unreferenced generated `CatCollection_Fall_*.anim`
+experiments. The controller continues referencing clips imported directly from the artist's FBXs.
+The setup command preserves valid explicit clip ranges and names when setting looping; obsolete
+take mappings are removed and missing delivered takes use their default ranges. It updates existing
+controller states and reuses the canonical prefab model child rather than discarding state-speed
+or transform tuning on every setup run. Runtime collection timing is unchanged by this cleanup.
+
+The August 30 matched-pose contact sheet showed similar opening motion across the old jump
+exports, with the strongest differences late in the clips. Distinct clip references or mesh hashes
+alone are not acceptance evidence for visible variety during the actual collection window.
+Validate revised clips at matched early times and during moving-hole collection before release.
+
+The artist supplied the revised combined `Cat.fbx` locally on September 2, not through a commit.
+Its take names changed completely: stale `Armature|Armature|...` importer entries produced no
+usable clips. The integration replaces obsolete take mappings with the actual delivered takes,
+while preserving valid authored clip names/ranges. The old separate animation FBXs are no longer
+the runtime sources. The canonical mesh also comes from the new delivery because its rest/bind
+pose differs from the old mesh. No bone-rotation workaround or clip curve rewriting is needed.
+The five obsolete separate model/animation FBXs and temporary diagnostic scripts were removed.
+
+September 2 verification passed for all six active controller motions and early mesh samples,
+rendered pose comparisons, 36 shuffle-bag assignments and moving-target tweens, and 20 actual
+level collections through hole completion and win. Restart mid-fall and next-level reload passed.
+The cat tint now targets only its configured body material slot, leaving textured white/details
+materials untouched. See `DropTheManCatAnimationIntegrationHandoff.md` for the maintained setup
+commands, verification scope, and remaining visual checks.
 
 ---
 
 ## Final Summary
 
-The current implementation is valid for the old MVP proof, but it compresses reservation, visual trigger, and capacity fill into one instant.
+The original MVP proof compressed reservation, visual trigger, and capacity fill into one instant.
 
-The recommended model is:
+The current model separates them:
 
 ```text
 swept drag detects same-color candidate
@@ -578,7 +654,8 @@ if full, full-hole completion begins
 This preserves drag-time collection ownership while matching the intended visual sequence.
 
 The concrete hole visual contract and direct presentation callback are defined in
-`DropTheManHolePresentationDesign.md`. Stickman collection presentation remains synchronous for
-now, but a full hole now enters `Closing` before its configured hole presentation and finalizes
-`Completed` only from the presentation callback. Missing or invalid hole presentation uses the
-same callback immediately.
+`DropTheManHolePresentationDesign.md`. Cat collection presentation is asynchronous when its
+configured Animator, falling clips, and tween presentation are valid. A full hole enters `Closing` only after the
+last required cat presentation callback converts its reservation into fill, and finalizes
+`Completed` only from the hole presentation callback. Missing or invalid cat or hole presentation
+uses the corresponding callback immediately.

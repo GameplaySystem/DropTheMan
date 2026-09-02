@@ -1,24 +1,30 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using PuzzleFramework.Presentation;
 
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
-    /// Minimal spawned presentation adapter for a Drop The Man collectable.
+    /// Spawned presentation adapter for a Drop The Man collectable.
     /// Collection eligibility is already decided by runtime rules before this component is
-    /// notified at the visual trigger threshold. The placeholder completes synchronously.
+    /// notified at the visual trigger threshold. The view reports visual completion by callback.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DropTheManStickmanView : MonoBehaviour, IDropTheManStickmanView
     {
         [SerializeField] private string runtimeId = string.Empty;
-        [SerializeField] private bool hideRenderersOnCollectionStarted = true;
+        [FormerlySerializedAs("hideRenderersOnCollectionStarted")]
+        [SerializeField] private bool hideRenderersOnCollectionCompleted = true;
         [SerializeField] private bool disableCollidersOnCollectionStarted = true;
-        [SerializeField] private bool destroySpawnedViewOnCollectionStarted = true;
+        [FormerlySerializedAs("destroySpawnedViewOnCollectionStarted")]
+        [SerializeField] private bool destroySpawnedViewOnCollectionCompleted = true;
         [SerializeField] private Renderer[] renderersToHide;
+        [SerializeField, Min(0)] private int bodyMaterialIndex;
         [SerializeField] private Collider[] collidersToDisable;
+        [SerializeField] private DropTheManCatCollectionPresentation collectionPresentation;
 
         private bool _collectionStarted;
+        private bool _collectionCompleted;
         private bool _isSpawnedClone;
 
         public string RuntimeId => runtimeId;
@@ -26,31 +32,21 @@ namespace DropAwayPrototype.Runtime
 
         private void Awake()
         {
-            if (renderersToHide == null || renderersToHide.Length == 0)
-            {
-                renderersToHide = GetComponentsInChildren<Renderer>(includeInactive: true);
-            }
-
-            if (collidersToDisable == null || collidersToDisable.Length == 0)
-            {
-                collidersToDisable = GetComponentsInChildren<Collider>(includeInactive: true);
-            }
+            EnsurePresentationTargets();
         }
 
-        public void OnCollectionStarted(StickmanRuntimeState stickman)
+        public bool TryPlayCollectionPresentation(
+            Transform collectionSocket,
+            System.Action completionCallback,
+            out string failureReason)
         {
             if (_collectionStarted)
             {
-                return;
+                failureReason = $"Stickman view '{runtimeId}' already started collection presentation.";
+                return false;
             }
 
             _collectionStarted = true;
-
-            if (_isSpawnedClone && destroySpawnedViewOnCollectionStarted)
-            {
-                Destroy(gameObject);
-                return;
-            }
 
             if (disableCollidersOnCollectionStarted && collidersToDisable != null)
             {
@@ -63,18 +59,39 @@ namespace DropAwayPrototype.Runtime
                 }
             }
 
-            if (!hideRenderersOnCollectionStarted || renderersToHide == null)
+            void CompleteOnce()
             {
-                return;
+                if (_collectionCompleted)
+                {
+                    return;
+                }
+
+                _collectionCompleted = true;
+                ApplyCollectedVisualState();
+                completionCallback?.Invoke();
             }
 
-            for (int i = 0; i < renderersToHide.Length; i++)
+            EnsurePresentationTargets();
+            string presentationFailureReason = string.Empty;
+            if (collectionPresentation != null &&
+                collectionPresentation.TryPlay(
+                    collectionSocket,
+                    CompleteOnce,
+                    out presentationFailureReason))
             {
-                if (renderersToHide[i] != null)
-                {
-                    renderersToHide[i].enabled = false;
-                }
+                failureReason = string.Empty;
+                return true;
             }
+
+            string fallbackReason = collectionPresentation == null
+                ? "No cat collection presentation is configured."
+                : presentationFailureReason;
+            Debug.LogWarning(
+                $"Stickman view '{runtimeId}' is using immediate collection fallback: {fallbackReason}",
+                this);
+            CompleteOnce();
+            failureReason = string.Empty;
+            return true;
         }
 
         public void ConfigureSpawnedView(
@@ -85,8 +102,10 @@ namespace DropAwayPrototype.Runtime
             runtimeId = newRuntimeId;
             transform.position = worldPosition;
             _collectionStarted = false;
+            _collectionCompleted = false;
             _isSpawnedClone = true;
             EnsurePresentationTargets();
+            collectionPresentation?.ResetPresentation();
 
             if (collidersToDisable != null)
             {
@@ -110,7 +129,7 @@ namespace DropAwayPrototype.Runtime
                 }
             }
 
-            DropTheManViewPresentationUtility.ApplyColor(renderersToHide, colorIdentity);
+            DropTheManViewPresentationUtility.ApplyColor(renderersToHide, colorIdentity, bodyMaterialIndex);
         }
 
         private void EnsurePresentationTargets()
@@ -124,7 +143,30 @@ namespace DropAwayPrototype.Runtime
             {
                 collidersToDisable = GetComponentsInChildren<Collider>(includeInactive: true);
             }
+
+            if (collectionPresentation == null)
+            {
+                TryGetComponent(out collectionPresentation);
+            }
         }
 
+        private void ApplyCollectedVisualState()
+        {
+            if (hideRenderersOnCollectionCompleted && renderersToHide != null)
+            {
+                for (int i = 0; i < renderersToHide.Length; i++)
+                {
+                    if (renderersToHide[i] != null)
+                    {
+                        renderersToHide[i].enabled = false;
+                    }
+                }
+            }
+
+            if (_isSpawnedClone && destroySpawnedViewOnCollectionCompleted)
+            {
+                Destroy(gameObject);
+            }
+        }
     }
 }

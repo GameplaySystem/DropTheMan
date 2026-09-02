@@ -96,6 +96,27 @@ namespace DropAwayPrototype.Runtime
             return true;
         }
 
+        public bool TryClaimCollectionSocket(
+            string collectibleId,
+            Vector3 collectibleWorldPosition,
+            out Transform collectionSocket,
+            out string failureReason)
+        {
+            EnsurePresentationTargets();
+            if (completionPresentation == null)
+            {
+                collectionSocket = null;
+                failureReason = $"Hole view '{runtimeId}' has no hole presentation.";
+                return false;
+            }
+
+            return completionPresentation.TryClaimCollectionSocket(
+                collectibleId,
+                collectibleWorldPosition,
+                out collectionSocket,
+                out failureReason);
+        }
+
         public void ApplyWorldPosition(Vector3 worldPosition)
         {
             if (preserveWorldYOnApply)
@@ -256,7 +277,10 @@ namespace DropAwayPrototype.Runtime
             new(0.36f, 0.36f, 0.40f, 1f)
         };
 
-        public static void ApplyColor(Renderer[] renderers, ColorIdentity colorIdentity)
+        public static void ApplyColor(
+            Renderer[] renderers,
+            ColorIdentity colorIdentity,
+            int materialIndex = -1)
         {
             if (renderers == null)
             {
@@ -277,7 +301,12 @@ namespace DropAwayPrototype.Runtime
                 propertyBlock.Clear();
                 propertyBlock.SetColor("_BaseColor", fallbackColor);
                 propertyBlock.SetColor("_Color", fallbackColor);
-                renderer.SetPropertyBlock(propertyBlock);
+                // Cat color belongs only to the body slot; its textured white/details slot must
+                // retain the artist material. Hole renderers keep their renderer-wide tint.
+                if (materialIndex >= 0)
+                    renderer.SetPropertyBlock(propertyBlock, materialIndex);
+                else
+                    renderer.SetPropertyBlock(propertyBlock);
             }
         }
 

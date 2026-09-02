@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 290246758527273844}
   - component: {fileID: 5904404784402140045}
+  - component: {fileID: 4899818452093276875}
   m_Layer: 0
   m_Name: CatCollectible
   m_TagString: Untagged
@@ -43,15 +44,47 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5cade72d155b4aa799ebf9618c8b9ba7, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManStickmanView
-  runtimeId:
-  hideRenderersOnCollectionStarted: 1
+  runtimeId: 
+  hideRenderersOnCollectionCompleted: 1
   disableCollidersOnCollectionStarted: 1
-  destroySpawnedViewOnCollectionStarted: 1
+  destroySpawnedViewOnCollectionCompleted: 1
   renderersToHide:
-  - {fileID: 8774551217675816835}
+  - {fileID: 7658347283224064757}
+  bodyMaterialIndex: 0
   collidersToDisable: []
+  collectionPresentation: {fileID: 4899818452093276875}
+--- !u!114 &4899818452093276875
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5819592439888056405}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 874a55170ccb4c57b2e7735d6fbfe261, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManCatCollectionPresentation
+  presentationRoot: {fileID: 8851073475750202586}
+  animator: {fileID: 7766965988255732627}
+  fallingClips:
+  - {fileID: -6280973570143861496, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  - {fileID: -462483024816596075, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  - {fileID: -3693822133254789559, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  - {fileID: -2095421438942372615, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  - {fileID: 8611666512974076518, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  - {fileID: -2792682483606040193, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  riseHeight: 0.8
+  approachDuration: 0.35
+  approachEase: 6
+  fallDepth: 3.5
+  fallDuration: 0.7
+  fallEase: 5
+  finalScaleMultiplier: 0.05
+  shrinkEase: 5
+  useUnscaledTime: 0
 --- !u!1 &7322141965199847230
 GameObject:
   m_ObjectHideFlags: 0
@@ -81,10 +114,10 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3362921383445656735}
+  - {fileID: 4407303019486235113}
   m_Father: {fileID: 290246758527273844}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &2963868090601476980
+--- !u!1001 &4225321771488161282
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -136,18 +169,35 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cat
       objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 0c2060f6c7b613843ba38726960ba4cd, type: 2}
+    - target: {fileID: 5866666021909216657, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+      propertyPath: m_CullingMode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
---- !u!4 &3362921383445656735 stripped
+--- !u!4 &4407303019486235113 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
-  m_PrefabInstance: {fileID: 2963868090601476980}
+  m_PrefabInstance: {fileID: 4225321771488161282}
   m_PrefabAsset: {fileID: 0}
---- !u!137 &8774551217675816835 stripped
+--- !u!137 &7658347283224064757 stripped
 SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 5828979002318216439, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
-  m_PrefabInstance: {fileID: 2963868090601476980}
+  m_PrefabInstance: {fileID: 4225321771488161282}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &7766965988255732627 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
+  m_PrefabInstance: {fileID: 4225321771488161282}
   m_PrefabAsset: {fileID: 0}

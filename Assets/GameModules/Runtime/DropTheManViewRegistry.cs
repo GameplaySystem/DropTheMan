@@ -14,6 +14,11 @@ namespace DropAwayPrototype.Runtime
         Vector3 WorldPosition { get; }
         void ApplyWorldPosition(Vector3 worldPosition);
         void SetSelectable(bool isSelectable);
+        bool TryClaimCollectionSocket(
+            string collectibleId,
+            Vector3 collectibleWorldPosition,
+            out Transform collectionSocket,
+            out string failureReason);
         bool TryPlayCompletionPresentation(
             Action completionCallback,
             out string failureReason);
@@ -22,12 +27,15 @@ namespace DropAwayPrototype.Runtime
     /// <summary>
     /// Minimal scene-side adapter for a pre-placed Drop The Man stickman view.
     /// Collection is reserved by runtime rules and has reached its visual trigger threshold
-    /// before this hook is invoked. The current placeholder completes when this call returns.
+    /// before this hook is invoked. The view reports completion through the callback.
     /// </summary>
     public interface IDropTheManStickmanView
     {
         string RuntimeId { get; }
-        void OnCollectionStarted(StickmanRuntimeState stickman);
+        bool TryPlayCollectionPresentation(
+            Transform collectionSocket,
+            Action completionCallback,
+            out string failureReason);
     }
 
     /// <summary>
@@ -225,8 +233,9 @@ namespace DropAwayPrototype.Runtime
                 : DropTheManViewRegistryResult.Failed(failureReason);
         }
 
-        public DropTheManViewRegistryResult NotifyCollectionStarted(
-            StickmanRuntimeState stickman)
+        public DropTheManViewRegistryResult BeginCollectionPresentation(
+            StickmanRuntimeState stickman,
+            Action completionCallback)
         {
             if (stickman == null)
             {
@@ -246,8 +255,36 @@ namespace DropAwayPrototype.Runtime
                     $"Stickman view '{stickman.Id}' was destroyed before collection presentation could start.");
             }
 
-            view.OnCollectionStarted(stickman);
-            return DropTheManViewRegistryResult.Successful();
+            Transform collectionSocket = null;
+            string socketFailureReason = string.Empty;
+            if (!TryGetHoleView(stickman.ReservedHoleId, out IDropTheManHoleView holeView) ||
+                (holeView is UnityEngine.Object holeObject && holeObject == null))
+            {
+                socketFailureReason =
+                    $"No live hole view is registered for reserved hole '{stickman.ReservedHoleId}'.";
+            }
+            else if (!holeView.TryClaimCollectionSocket(
+                         stickman.Id,
+                         (view as Component)?.transform.position ?? Vector3.zero,
+                         out collectionSocket,
+                         out socketFailureReason))
+            {
+                collectionSocket = null;
+            }
+
+            if (!string.IsNullOrEmpty(socketFailureReason))
+            {
+                Debug.LogWarning(
+                    $"Stickman '{stickman.Id}' is using immediate collection fallback: " +
+                    socketFailureReason);
+            }
+
+            return view.TryPlayCollectionPresentation(
+                collectionSocket,
+                completionCallback,
+                out string failureReason)
+                ? DropTheManViewRegistryResult.Successful()
+                : DropTheManViewRegistryResult.Failed(failureReason);
         }
 
         public bool TryResolveHoleState(

@@ -64,7 +64,8 @@ new visual-only nearest-cell alignment before closing still requires manual vali
 * cap-close and shrink tween configuration
 * cancelling owned tweens when disabled or destroyed
 * reporting one completion callback after the visual sequence finishes
-* exposing authored collection sockets for later cat presentation
+* assigning authored collection sockets for cat presentation
+* keeping assigned socket transforms live while their hole root moves
 
 ### PuzzleFramework does not own
 
@@ -156,8 +157,11 @@ For the planned shapes this means:
 Sockets are presentation targets, not capacity truth. Runtime capacity remains derived from the
 shape footprint.
 
-Later cat presentation should choose the closest available socket inside the cat's already-assigned
-hole. It must not choose a different hole based on visual distance.
+Cat presentation chooses the closest available socket inside the cat's already-assigned hole. It
+must not choose a different hole based on visual distance. Equal-distance candidates use authored
+array order. A claimed socket remains claimed until the hole presentation is reset so concurrent
+cats do not target the same slot. Runtime capacity and reservation remain authoritative; socket
+assignment is presentation-only.
 
 ---
 
@@ -249,7 +253,6 @@ Automated or focused fallback-path coverage should still verify:
 ## Deferred Work
 
 * production receiver materials and complete URP auxiliary passes
-* cat falling animation and socket reservation
 * rotated-shape, root-alignment, collider, and completion validation for the seven non-single
   prefabs
 * final cavity lighting policy; current sharp inner-wall self-shadows remain an art review item

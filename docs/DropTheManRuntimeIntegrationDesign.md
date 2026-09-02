@@ -374,9 +374,9 @@ registry finds each stickman view
     ->
 view starts collection presentation
     ->
-current placeholder returns synchronously
+view callback reports presentation completion
     ->
-drag-session owner converts the reserved slot into fill
+drag-session owner resolves ReservedHoleId and converts the reserved slot into fill
 ```
 
 Full-hole completion:
@@ -467,7 +467,7 @@ apply returned authoritative world position to the active hole view
     ->
 start collection presentation for newly collecting stickmen
     ->
-report synchronous placeholder completion to the drag-session owner
+on each direct callback, report presentation completion to the drag-session owner
     ->
 if the hole becomes Full, cancel drag and begin the registered completion presentation
     ->
@@ -546,9 +546,10 @@ The integration layer observes:
 NewlyCollectingStickmen
 ```
 
-and forwards those runtime states to views for presentation. When the current synchronous
-placeholder hook returns, integration explicitly reports presentation completion to the
-drag-session owner so the reserved slot can become filled.
+and forwards those runtime states to views for presentation. The view's direct callback explicitly
+reports presentation completion to the drag-session owner so the reserved slot can become filled.
+That operation resolves the assigned hole from `ReservedHoleId` and does not require an active drag
+session, allowing collection to finish after release.
 
 The integration layer must not re-check color matching or collection acceptance.
 
@@ -560,9 +561,10 @@ Full-hole completion starts inside:
 DropTheManDragSessionOwner.CompleteCollectionPresentation(...)
 ```
 
-after the triggered placeholder presentation returns and capacity fill makes the hole `Full`.
-This still happens in the controller call handling the accepted drag input sample; release remains
-outside the collection and full-hole path.
+after the triggered collection presentation callback converts capacity fill and makes the hole
+`Full`. A synchronous fallback may still complete inside the accepted drag input call, while a
+valid asynchronous cat presentation completes later. Release remains outside the collection and
+full-hole path and does not cancel a valid in-flight collection.
 
 The begin call returns:
 

@@ -393,42 +393,24 @@ namespace DropAwayPrototype.Runtime
                     applyResult.FailureReason);
             }
 
-            if (!TryCompleteTriggeredCollections(
+            DropTheManOutcomeRoutingResult outcomeResult = default;
+            bool terminalAccepted = false;
+            bool outcomeWasHandled = false;
+
+            if (!TryBeginTriggeredCollectionPresentations(
                     updateResult,
-                    out DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+                    out outcomeResult,
+                    out outcomeWasHandled,
+                    out terminalAccepted,
                     out string collectionFailureReason))
             {
                 CancelActiveDragWithoutReleaseCommit();
                 return DropTheManRuntimeControllerResult.UpdatedDrag(
                     false,
                     updateResult.AuthoritativeWorldPosition,
-                    false,
-                    default,
+                    terminalAccepted,
+                    outcomeResult,
                     collectionFailureReason);
-            }
-
-            DropTheManOutcomeRoutingResult outcomeResult = default;
-            bool terminalAccepted = false;
-            bool outcomeWasHandled = false;
-
-            if (fullHoleCompletionResult.Success &&
-                fullHoleCompletionResult.PresentationPending)
-            {
-                if (!TryBeginFullHoleCompletionPresentation(
-                        fullHoleCompletionResult,
-                        out outcomeResult,
-                        out outcomeWasHandled,
-                        out terminalAccepted,
-                        out string presentationFailureReason))
-                {
-                    CancelActiveDragWithoutReleaseCommit();
-                    return DropTheManRuntimeControllerResult.UpdatedDrag(
-                        false,
-                        updateResult.AuthoritativeWorldPosition,
-                        terminalAccepted,
-                        outcomeResult,
-                        presentationFailureReason);
-                }
             }
 
             if (!updateResult.Success)
@@ -594,43 +576,114 @@ namespace DropAwayPrototype.Runtime
                 outcomeResult.Reason);
         }
 
-        private bool TryCompleteTriggeredCollections(
+        private bool TryBeginTriggeredCollectionPresentations(
             DropTheManDragSessionUpdateResult updateResult,
-            out DropTheManFullHoleCompletionResult fullHoleCompletionResult,
+            out DropTheManOutcomeRoutingResult outcomeResult,
+            out bool outcomeWasHandled,
+            out bool terminalAccepted,
             out string failureReason)
         {
-            fullHoleCompletionResult = DropTheManFullHoleCompletionResult.NotTriggered();
+            outcomeResult = default;
+            outcomeWasHandled = false;
+            terminalAccepted = false;
+            failureReason = string.Empty;
 
             for (int i = 0; i < updateResult.NewlyCollectingStickmen.Count; i++)
             {
-                DropTheManViewRegistryResult notifyResult =
-                    _viewRegistry.NotifyCollectionStarted(
-                        updateResult.NewlyCollectingStickmen[i]);
-                if (!notifyResult.Success)
+                StickmanRuntimeState stickman = updateResult.NewlyCollectingStickmen[i];
+                bool callbackInvoked = false;
+                DropTheManOutcomeRoutingResult callbackOutcomeResult = default;
+                bool callbackOutcomeWasHandled = false;
+                bool callbackTerminalAccepted = false;
+                string callbackFailureReason = string.Empty;
+
+                void CompleteFromPresentation()
                 {
-                    failureReason = notifyResult.FailureReason;
+                    if (callbackInvoked)
+                    {
+                        return;
+                    }
+
+                    callbackInvoked = true;
+                    if (!TryHandleCollectionPresentationCompleted(
+                            stickman,
+                            out callbackOutcomeResult,
+                            out callbackOutcomeWasHandled,
+                            out callbackTerminalAccepted,
+                            out callbackFailureReason))
+                    {
+                        Debug.LogError(callbackFailureReason);
+                    }
+                }
+
+                DropTheManViewRegistryResult presentationResult =
+                    _viewRegistry.BeginCollectionPresentation(
+                        stickman,
+                        CompleteFromPresentation);
+                if (!presentationResult.Success)
+                {
+                    Debug.LogWarning(
+                        $"Stickman '{stickman.Id}' is using immediate collection fallback: " +
+                        presentationResult.FailureReason);
+                    CompleteFromPresentation();
+                }
+
+                if (!callbackInvoked)
+                {
+                    continue;
+                }
+
+                outcomeResult = callbackOutcomeResult;
+                outcomeWasHandled = callbackOutcomeWasHandled;
+                terminalAccepted = callbackTerminalAccepted;
+                failureReason = callbackFailureReason;
+                if (!string.IsNullOrEmpty(failureReason))
+                {
                     return false;
                 }
 
-                DropTheManCollectionPresentationCompletionResult completionResult =
-                    _dragSessionOwner.CompleteCollectionPresentation(
-                        updateResult.NewlyCollectingStickmen[i]);
-                if (!completionResult.Success)
+                if (terminalAccepted)
                 {
-                    failureReason = completionResult.FailureReason;
-                    return false;
-                }
-
-                if (completionResult.HoleBecameFull)
-                {
-                    fullHoleCompletionResult =
-                        completionResult.FullHoleCompletionResult;
                     break;
                 }
             }
 
-            failureReason = string.Empty;
             return true;
+        }
+
+        private bool TryHandleCollectionPresentationCompleted(
+            StickmanRuntimeState stickman,
+            out DropTheManOutcomeRoutingResult outcomeResult,
+            out bool outcomeWasHandled,
+            out bool terminalAccepted,
+            out string failureReason)
+        {
+            outcomeResult = default;
+            outcomeWasHandled = false;
+            terminalAccepted = false;
+
+            DropTheManCollectionPresentationCompletionResult completionResult =
+                _dragSessionOwner.CompleteCollectionPresentation(
+                    _runtimeModel,
+                    stickman);
+            if (!completionResult.Success)
+            {
+                failureReason = completionResult.FailureReason;
+                return false;
+            }
+
+            if (!completionResult.HoleBecameFull)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            return TryBeginFullHoleCompletionPresentation(
+                completionResult.FullHoleCompletionResult,
+                out outcomeResult,
+                out outcomeWasHandled,
+                out terminalAccepted,
+                out failureReason);
         }
 
         private bool CanAcceptInput(out string failureReason)

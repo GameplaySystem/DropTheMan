@@ -38,6 +38,7 @@ namespace DropAwayPrototype.Runtime
         private int _capCloseBlendShapeIndex = -1;
         private bool _hasCapturedPresentationScale;
         private bool _hasCapturedCapWeight;
+        private readonly Dictionary<string, Transform> _claimedCollectionSockets = new();
 
         /// <summary>
         /// Presentation targets used later by cat collection animation. Runtime footprint capacity
@@ -119,29 +120,65 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            if (collectionSockets == null || collectionSockets.Length == 0)
+            return TryValidateCollectionSockets(out failureReason);
+        }
+
+        /// <summary>
+        /// Claims the closest unclaimed authored socket for one already-reserved collectible.
+        /// Runtime capacity remains authoritative; this claim exists only to prevent visual overlap.
+        /// </summary>
+        public bool TryClaimCollectionSocket(
+            string collectibleId,
+            Vector3 collectibleWorldPosition,
+            out Transform collectionSocket,
+            out string failureReason)
+        {
+            collectionSocket = null;
+            if (string.IsNullOrWhiteSpace(collectibleId))
             {
-                failureReason = "At least one collection socket is required.";
+                failureReason = "A collectible runtime id is required to claim a collection socket.";
                 return false;
             }
 
-            HashSet<Transform> uniqueSockets = new();
-            for (int i = 0; i < collectionSockets.Length; i++)
+            if (_claimedCollectionSockets.TryGetValue(collectibleId, out collectionSocket) &&
+                collectionSocket != null)
             {
-                Transform socket = collectionSockets[i];
-                if (socket == null)
-                {
-                    failureReason = $"Collection socket {i} is missing.";
-                    return false;
-                }
-
-                if (!uniqueSockets.Add(socket))
-                {
-                    failureReason = $"Collection socket {i} duplicates another socket reference.";
-                    return false;
-                }
+                failureReason = string.Empty;
+                return true;
             }
 
+            if (!TryValidateCollectionSockets(out failureReason))
+            {
+                return false;
+            }
+
+            float closestDistanceSquared = float.PositiveInfinity;
+            for (int i = 0; i < collectionSockets.Length; i++)
+            {
+                Transform candidate = collectionSockets[i];
+                if (_claimedCollectionSockets.ContainsValue(candidate))
+                {
+                    continue;
+                }
+
+                float distanceSquared =
+                    (candidate.position - collectibleWorldPosition).sqrMagnitude;
+                if (distanceSquared >= closestDistanceSquared)
+                {
+                    continue;
+                }
+
+                closestDistanceSquared = distanceSquared;
+                collectionSocket = candidate;
+            }
+
+            if (collectionSocket == null)
+            {
+                failureReason = "No unclaimed collection socket is available.";
+                return false;
+            }
+
+            _claimedCollectionSockets.Add(collectibleId, collectionSocket);
             failureReason = string.Empty;
             return true;
         }
@@ -215,6 +252,7 @@ namespace DropAwayPrototype.Runtime
         {
             CaptureAuthoredState();
             CancelCompletion(resetPresentation: true);
+            _claimedCollectionSockets.Clear();
         }
 
         [ContextMenu("Validate Configuration")]
@@ -294,6 +332,35 @@ namespace DropAwayPrototype.Runtime
             }
 
             _capCloseBlendShapeIndex = blendShapeIndex;
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private bool TryValidateCollectionSockets(out string failureReason)
+        {
+            if (collectionSockets == null || collectionSockets.Length == 0)
+            {
+                failureReason = "At least one collection socket is required.";
+                return false;
+            }
+
+            HashSet<Transform> uniqueSockets = new();
+            for (int i = 0; i < collectionSockets.Length; i++)
+            {
+                Transform socket = collectionSockets[i];
+                if (socket == null)
+                {
+                    failureReason = $"Collection socket {i} is missing.";
+                    return false;
+                }
+
+                if (!uniqueSockets.Add(socket))
+                {
+                    failureReason = $"Collection socket {i} duplicates another socket reference.";
+                    return false;
+                }
+            }
+
             failureReason = string.Empty;
             return true;
         }
