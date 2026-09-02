@@ -1,0 +1,6 @@
+{
+  "name": "DropAwayPrototype.Tests.EditMode",
+  "references": ["DropAwayPrototype.Runtime", "PuzzleFramework.Runtime"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

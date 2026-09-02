@@ -265,6 +265,8 @@ namespace DropAwayPrototype.Runtime
         public bool HasActiveDrag => _dragSessionOwner.HasSessionContext;
         public bool TerminalOutcomeAccepted => _terminalOutcomeAccepted || IsTerminal(_gameStateSystem.CurrentState);
         public GameState CurrentGameState => _gameStateSystem.CurrentState;
+        /// <summary>Once-only terminal fact for the active level's game-owned progression adapter.</summary>
+        public event Action<GameState> TerminalOutcomeAcceptedNow;
 
         /// <summary>
         /// Starts gameplay through the framework game-state system and starts the optional
@@ -865,8 +867,10 @@ namespace DropAwayPrototype.Runtime
 
         private void AcceptTerminalOutcomeAndStopInput()
         {
+            if (_terminalOutcomeAccepted) return;
             _terminalOutcomeAccepted = true;
             CancelActiveDragWithoutReleaseCommit();
+            TerminalOutcomeAcceptedNow?.Invoke(_gameStateSystem.CurrentState);
         }
 
         private void CancelActiveDragWithoutReleaseCommit()

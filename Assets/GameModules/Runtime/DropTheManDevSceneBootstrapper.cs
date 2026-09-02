@@ -8,13 +8,15 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using System.Collections.Generic;
 using System;
+using System.IO;
+using PuzzleFramework.Progression;
 
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
     /// Dev-only gameplay-scene bridge that builds a Drop The Man runtime model, initializes
     /// the pre-wired scene controller, and can drive a Resources-backed level catalog plus
-    /// temporary result HUD. This is not production level loading or progression.
+    /// temporary result HUD. Progression is delegated to a profile session and game-owned policy.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DropTheManDevSceneBootstrapper : MonoBehaviour
@@ -28,6 +30,12 @@ namespace DropAwayPrototype.Runtime
             DropTheManDevLevelSource.ResourcesCatalog;
         [SerializeField] private string resourcesLevelCatalogPath = "DropTheMan/Levels";
         [SerializeField, Min(0)] private int startingLevelIndex;
+        [Header("Progression")]
+        [Tooltip("Editor uses a separate sandbox file. Disable to use the authored starting level without saving.")]
+        [SerializeField] private bool useProgressionInEditor = true;
+        [SerializeField, Min(1)] private int loopFirstLevel = 1;
+        [Tooltip("Inclusive last level number; 0 means the last shipped level.")]
+        [SerializeField, Min(0)] private int loopLastLevel;
         [FormerlySerializedAs("boardWorldOrigin")]
         [SerializeField] private Vector3 boardWorldCenter = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
@@ -55,6 +63,20 @@ namespace DropAwayPrototype.Runtime
         private LevelResultState _resultState;
         private bool _resultWindowVisible;
         private Rect _resultWindowRect = DefaultResultWindowRect;
+        private DropTheManProgressionSession _progression;
+        private DropTheManRuntimeController _observedController;
+        private string _progressionLoadError = string.Empty;
+        private bool _showLevelPicker;
+        private int _levelPickerPage;
+        private Rect _levelPickerRect = new(20f, 90f, 280f, 400f);
+        private const int LevelPickerWindowId = 104202;
+        private const int LevelsPerPage = 8;
+        public string ProgressSavePath => Path.Combine(Application.persistentDataPath, "DropTheMan",
+            Application.isEditor ? "progress.editor.json" : "progress.json");
+        public string ProgressError => !string.IsNullOrEmpty(_progressionLoadError)
+            ? _progressionLoadError : _progression?.Error ?? string.Empty;
+        public bool ProgressionEnabled => levelSource == DropTheManDevLevelSource.ResourcesCatalog &&
+            (!Application.isEditor || useProgressionInEditor);
 
         private void Awake()
         {
@@ -101,7 +123,8 @@ namespace DropAwayPrototype.Runtime
 
         private void OnGUI()
         {
-            if (!_resultWindowVisible)
+            DrawProgressionControls();
+            if (!_resultWindowVisible || _showLevelPicker)
             {
                 return;
             }
@@ -131,7 +154,11 @@ namespace DropAwayPrototype.Runtime
                 {
                     return false;
                 }
-
+                if (ProgressionEnabled)
+                {
+                    if (!TryInitializeProgression(out failureReason)) return false;
+                    return TryContinueCampaign(out failureReason);
+                }
                 return TryLoadLevelAtIndex(ResolveStartingLevelIndex(), out failureReason);
             }
 
@@ -162,18 +189,32 @@ namespace DropAwayPrototype.Runtime
                 int restartIndex = IsValidLevelCatalogIndex(_currentLevelIndex)
                     ? _currentLevelIndex
                     : ResolveStartingLevelIndex();
-                return TryLoadLevelAtIndex(restartIndex, out failureReason);
+                // Restarting a won campaign level is a replay, not another campaign advancement.
+                bool replay = _progression != null &&
+                    (_progression.IsReplay || _observedController?.CurrentGameState == GameState.Won);
+                return TryLoadLevelAtIndex(restartIndex, out failureReason, replay);
             }
 
             return TryBootstrapConfiguredSource(out failureReason);
         }
 
         /// <summary>
-        /// Loads the next JSON level from the discovered Resources catalog.
-        /// This remains prototype-owned test-scene flow rather than framework progression.
+        /// Loads the post-win replay successor or campaign selection through the catalog.
+        /// Without progression, retains the authored next-index test flow.
         /// </summary>
         public bool TryLoadNextLevel(out string failureReason)
         {
+            if (ProgressionEnabled)
+            {
+                if (_progression == null)
+                {
+                    failureReason = "Progression has not loaded.";
+                    return false;
+                }
+                if (!_progression.TryGetNextLevelAfterWin(out string nextId, out bool isReplay, out failureReason))
+                    return false;
+                return TryLoadProgressLevel(nextId, isReplay, out failureReason);
+            }
             if (!CanUseLevelCatalog(out failureReason))
             {
                 return false;
@@ -195,7 +236,7 @@ namespace DropAwayPrototype.Runtime
             return TryLoadLevelAtIndex(nextLevelIndex, out failureReason);
         }
 
-        private bool TryLoadLevelAtIndex(int levelIndex, out string failureReason)
+        private bool TryLoadLevelAtIndex(int levelIndex, out string failureReason, bool isReplay = false)
         {
             if (!HasLevelCatalog())
             {
@@ -217,6 +258,14 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
+            if (ProgressionEnabled && (_progression?.Levels == null ||
+                (isReplay ? !_progression.Levels.CanReplay(catalogEntry.LevelId) :
+                    _progression.Levels.GetContinueLevelId() != catalogEntry.LevelId)))
+            {
+                failureReason = "Load a valid profile and select its campaign level or a completed replay.";
+                return false;
+            }
+
             bool loaded = TryBootstrapFromProvider(
                 new DropTheManJsonLevelDefinitionProvider(catalogEntry.Asset),
                 out LevelDefinition levelDefinition,
@@ -228,6 +277,13 @@ namespace DropAwayPrototype.Runtime
 
             _currentLevelIndex = levelIndex;
             CaptureLoadedLevelMetadata(levelDefinition);
+            _showLevelPicker = false;
+            if (ProgressionEnabled)
+            {
+                _progression.BeginLevel(_currentLevelId, isReplay);
+                _observedController = sceneController.RuntimeController;
+                _observedController.TerminalOutcomeAcceptedNow += HandleAcceptedOutcome;
+            }
             return true;
         }
 
@@ -653,6 +709,7 @@ namespace DropAwayPrototype.Runtime
 
         private void ResetLoadState()
         {
+            UnsubscribeProgression();
             sceneController?.DisableInput();
             sceneController?.CancelDrag();
             sceneController?.ClearPointerState();
@@ -687,6 +744,7 @@ namespace DropAwayPrototype.Runtime
 
         private bool HasNextLevel()
         {
+            if (ProgressionEnabled) return _progression?.Levels != null;
             return IsValidLevelCatalogIndex(_currentLevelIndex + 1);
         }
 
@@ -734,6 +792,140 @@ namespace DropAwayPrototype.Runtime
         {
             _currentLevelId = levelDefinition?.Metadata?.LevelId ?? string.Empty;
             _currentDisplayName = levelDefinition?.Metadata?.DisplayName ?? _currentLevelId;
+        }
+
+        private bool TryInitializeProgression(out string failureReason)
+        {
+            if (_progression?.Levels != null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+            List<LevelCatalogMetadata> levels = new();
+            foreach (LevelCatalogEntry entry in _levelCatalog.Entries)
+                levels.Add(new LevelCatalogMetadata(entry.LevelId, entry.SequenceNumber));
+            _progression = new DropTheManProgressionSession(new JsonProgressSaveLoadService(), ProgressSavePath);
+            bool loaded = _progression.TryLoad(levels, loopFirstLevel, loopLastLevel);
+            _progressionLoadError = loaded ? string.Empty : _progression.Error;
+            failureReason = _progressionLoadError;
+            return loaded;
+        }
+
+        /// <summary>Loads the saved campaign selection, not the next entry after a manual replay.</summary>
+        public bool TryContinueCampaign(out string failureReason)
+        {
+            if (!ProgressionEnabled || !HasLevelCatalog() || _progression?.Levels == null)
+            {
+                failureReason = "Progression has not loaded.";
+                return false;
+            }
+            return TryLoadProgressLevel(_progression.Levels.GetContinueLevelId(), false, out failureReason);
+        }
+
+        /// <summary>Loads completed shipped content without changing campaign progression.</summary>
+        public bool TryReplayLevel(string levelId, out string failureReason)
+        {
+            if (!ProgressionEnabled || !HasLevelCatalog() || _progression?.Levels == null ||
+                !_progression.Levels.CanReplay(levelId))
+            {
+                failureReason = "Only completed shipped levels are available for replay.";
+                return false;
+            }
+            return TryLoadProgressLevel(levelId, true, out failureReason);
+        }
+
+        private bool TryLoadProgressLevel(string levelId, bool isReplay, out string failureReason)
+        {
+            for (int i = 0; i < _levelCatalog.Count; i++)
+                if (_levelCatalog.Entries[i].LevelId == levelId)
+                    return TryLoadLevelAtIndex(i, out failureReason, isReplay);
+            failureReason = $"Saved level '{levelId}' is not in the current catalog.";
+            return false;
+        }
+
+        private void HandleAcceptedOutcome(GameState state)
+        {
+            if (state != GameState.Won || !ProgressionEnabled) return;
+            _progression?.RecordAcceptedWin();
+            if (!string.IsNullOrEmpty(ProgressError)) Debug.LogWarning(ProgressError, this);
+        }
+
+        private void UnsubscribeProgression()
+        {
+            if (_observedController == null) return;
+            _observedController.TerminalOutcomeAcceptedNow -= HandleAcceptedOutcome;
+            _observedController = null;
+        }
+
+        private void OnDestroy() => UnsubscribeProgression();
+        private void OnApplicationPause(bool paused) { if (paused) _progression?.TrySave(); }
+        private void OnApplicationQuit() => _progression?.TrySave();
+
+        private void DrawProgressionControls()
+        {
+            if (!ProgressionEnabled) return;
+            GUILayout.BeginArea(new Rect(20f, Mathf.Max(20f, Screen.height - 145f),
+                Mathf.Min(360f, Screen.width - 40f), 130f), GUI.skin.box);
+            if (Application.isEditor) GUILayout.Label("Progression: Editor sandbox");
+            if (!string.IsNullOrEmpty(ProgressError))
+            {
+                GUILayout.Label(ProgressError);
+                if (GUILayout.Button(_progression?.Levels == null ? "Retry Load" : "Retry Save"))
+                {
+                    if (_progression?.Levels == null) Bootstrap();
+                    else _progression.TrySave();
+                }
+            }
+            else if (_progression?.Levels != null)
+            {
+                GUILayout.Label($"Continue: {_progression.Levels.GetContinueLevelId()}" +
+                    (_progression.IsReplay ? " (currently replaying)" : string.Empty));
+                if (GUILayout.Button(_showLevelPicker ? "Close Levels" : "Levels / Replay"))
+                    SetLevelPickerVisible(!_showLevelPicker);
+            }
+            GUILayout.EndArea();
+            if (_showLevelPicker)
+                _levelPickerRect = GUI.Window(LevelPickerWindowId, _levelPickerRect,
+                    DrawLevelPicker, "Completed Levels");
+        }
+
+        private void SetLevelPickerVisible(bool visible)
+        {
+            _showLevelPicker = visible;
+            if (visible)
+            {
+                sceneController.CancelDrag();
+                sceneController.DisableInput();
+            }
+            else sceneController.EnableInput();
+        }
+
+        private void DrawLevelPicker(int windowId)
+        {
+            if (GUILayout.Button("Resume Campaign"))
+                if (!TryContinueCampaign(out string failure)) Debug.LogWarning(failure, this);
+            int pages = (_levelCatalog.Count + LevelsPerPage - 1) / LevelsPerPage;
+            _levelPickerPage = Mathf.Clamp(_levelPickerPage, 0, pages - 1);
+            int start = _levelPickerPage * LevelsPerPage;
+            for (int i = start; i < Mathf.Min(start + LevelsPerPage, _levelCatalog.Count); i++)
+            {
+                string id = _levelCatalog.Entries[i].LevelId;
+                bool canReplay = _progression.Levels.CanReplay(id);
+                GUI.enabled = canReplay;
+                if (GUILayout.Button(canReplay ? $"Replay {id}" : $"{id} (Locked)"))
+                    if (!TryReplayLevel(id, out string failure)) Debug.LogWarning(failure, this);
+            }
+            GUI.enabled = true;
+            GUILayout.BeginHorizontal();
+            GUI.enabled = _levelPickerPage > 0;
+            if (GUILayout.Button("Previous")) _levelPickerPage--;
+            GUI.enabled = _levelPickerPage + 1 < pages;
+            if (GUILayout.Button("Next")) _levelPickerPage++;
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.Label($"Page {_levelPickerPage + 1} / {pages}");
+            if (GUILayout.Button("Close")) SetLevelPickerVisible(false);
+            GUI.DragWindow(new Rect(0f, 0f, 10000f, 20f));
         }
 
         private string ResolveResultWindowTitle()

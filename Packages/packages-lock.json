@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "com.gaming.puzzleframework": {
-      "version": "https://github.com/Find-Games/PuzzleFramework.git?path=/Packages/com.gaming.puzzleframework#879de67ecb1b8f788d768acfd8cb4ac5b3329d89",
+      "version": "https://github.com/Find-Games/PuzzleFramework.git?path=/Packages/com.gaming.puzzleframework#96e9b7751686f2652c0374a40841e74c96c74c9f",
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "879de67ecb1b8f788d768acfd8cb4ac5b3329d89"
+      "hash": "96e9b7751686f2652c0374a40841e74c96c74c9f"
     },
     "com.unity.bindings.openimageio": {
       "version": "1.0.2",
