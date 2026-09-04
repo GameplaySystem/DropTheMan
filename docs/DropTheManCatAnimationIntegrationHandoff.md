@@ -60,7 +60,7 @@ non-looping jumps and distinct early baked-mesh sequences. Inspect early poses v
 If an artist renames the required takes, update the setup's explicit take list deliberately.
 Changing the rig requires its matching model/Avatar, not just a copied Avatar with similar names.
 
-Motion remains 0.35s approach + 0.7s fall, rise 0.8, depth 3.5, final scale 0.05. Clips run at authored
+Motion is tuned to 0.5s approach + 1.0s fall, rise 0.8, depth 3.5, final scale 0.05. Clips run at authored
 speed from zero; no guarantee is made that the complete 0.9-2.583s Jump takes play before hiding.
 `Idle_2` is imported and looped but is not the default or randomly selected. Additional idle behavior,
 endgame features and a new animation framework are intentionally out of scope.
