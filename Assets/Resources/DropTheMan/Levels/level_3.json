@@ -1,0 +1,309 @@
+{
+    "FormatVersion": 1,
+    "LevelId": "Level 3",
+    "DisplayName": "Drop The Man Dev Minimal",
+    "Board": {
+        "Width": 10,
+        "Height": 10,
+        "BlockedCells": []
+    },
+    "Timer": {
+        "Enabled": false,
+        "DurationSeconds": 60.0,
+        "WarningThresholdSeconds": 0.0
+    },
+    "Holes": [
+        {
+            "Id": "hole_001",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 8,
+                "Y": 6
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        },
+        {
+            "Id": "hole_002",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 6,
+                "Y": 6
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        },
+        {
+            "Id": "hole_003",
+            "Color": "Slot3",
+            "Coordinate": {
+                "X": 4,
+                "Y": 6
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        },
+        {
+            "Id": "hole_004",
+            "Color": "Slot2",
+            "Coordinate": {
+                "X": 2,
+                "Y": 6
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        },
+        {
+            "Id": "hole_005",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 0,
+                "Y": 6
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        }
+    ],
+    "Stickmen": [
+        {
+            "Id": "stickman_001",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 0,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_003",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 0,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_005",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 1,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_006",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 1,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_002",
+            "Color": "Slot2",
+            "Coordinate": {
+                "X": 2,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_004",
+            "Color": "Slot2",
+            "Coordinate": {
+                "X": 2,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_007",
+            "Color": "Slot2",
+            "Coordinate": {
+                "X": 3,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_008",
+            "Color": "Slot2",
+            "Coordinate": {
+                "X": 3,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_009",
+            "Color": "Slot3",
+            "Coordinate": {
+                "X": 4,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_010",
+            "Color": "Slot3",
+            "Coordinate": {
+                "X": 4,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_011",
+            "Color": "Slot3",
+            "Coordinate": {
+                "X": 5,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_012",
+            "Color": "Slot3",
+            "Coordinate": {
+                "X": 5,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_013",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 6,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_014",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 6,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_015",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 7,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_016",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 7,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_017",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 8,
+                "Y": 9
+            }
+        },
+        {
+            "Id": "stickman_018",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 8,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_019",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 9,
+                "Y": 8
+            }
+        },
+        {
+            "Id": "stickman_020",
+            "Color": "Slot5",
+            "Coordinate": {
+                "X": 9,
+                "Y": 9
+            }
+        }
+    ]
+}
