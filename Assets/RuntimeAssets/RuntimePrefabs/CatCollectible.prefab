@@ -77,10 +77,10 @@ MonoBehaviour:
   - {fileID: 8611666512974076518, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
   - {fileID: -2792682483606040193, guid: a83d9a51fc3717b48aa0531911f8d31c, type: 3}
   riseHeight: 0.8
-  approachDuration: 0.35
+  approachDuration: 0.5
   approachEase: 6
   fallDepth: 3.5
-  fallDuration: 0.7
+  fallDuration: 1
   fallEase: 5
   finalScaleMultiplier: 0.05
   shrinkEase: 5

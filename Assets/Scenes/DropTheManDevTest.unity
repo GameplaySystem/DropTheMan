@@ -205,13 +205,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 35023331}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.46174863, y: 0, z: 0, w: 0.8870109}
+  m_LocalRotation: {x: 0.60876137, y: 0, z: 0, w: 0.7933534}
   m_LocalPosition: {x: 0, y: 15, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 55, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 75, y: 0, z: 0}
 --- !u!114 &35023335
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -222,7 +222,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
   m_RenderShadows: 1
   m_RequiresDepthTextureOption: 2
@@ -364,7 +364,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
   m_UsePipelineSettings: 1
   m_AdditionalLightsShadowResolutionTier: 2
@@ -459,7 +459,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: DropAwayPrototype.Runtime::DropAwayPrototype.Runtime.DropTheManSceneController
   holeViewPrefabs:
+  - {fileID: 1853648356257173697, guid: 0753395e52c670748a074de0c55afba4, type: 3}
+  - {fileID: 4598469157859998269, guid: 30ac5eeb10e85264bb0ea6771c55055d, type: 3}
+  - {fileID: 2206057738106186755, guid: 74d71e590366f194b8ffde55f3e9a06b, type: 3}
+  - {fileID: 5577618686889704560, guid: 789b5a8e3a7b44545bb13b3e627862d2, type: 3}
+  - {fileID: 5830651157524465296, guid: 961acd857a8913542a92a20b678d0964, type: 3}
   - {fileID: 9113882530106290074, guid: b35cae307b38d25408a3b3626d6bfb16, type: 3}
+  - {fileID: 1156320614334401438, guid: 1401468ea1eceeb478c305a26f67cf60, type: 3}
+  - {fileID: 6050877633649271828, guid: 9ec02c3b8abfaf24ebd645b4c91c1dc6, type: 3}
   pointerInputAdapter: {fileID: 1823423592}
   startGameplayOnInitialize: 1
   tickTimerInUpdate: 1
@@ -569,13 +576,18 @@ MonoBehaviour:
   bootstrapOnStart: 1
   levelSource: 1
   resourcesLevelCatalogPath: DropTheMan/Levels
-  startingLevelIndex: 0
+  startingLevelIndex: 2
+  useProgressionInEditor: 1
+  loopFirstLevel: 1
+  loopLastLevel: 0
   boardWorldCenter: {x: 0, y: 0, z: 0}
   cellSize: {x: 1, y: 1}
   boardGridXAxis: {x: 1, y: 0, z: 0}
   boardGridYAxis: {x: 0, y: 0, z: 1}
   visualConfig: {fileID: 11400000, guid: 5eaafec96386791448bc0eb0c4d8647f, type: 2}
   runtimeViewSpawnRoot: {fileID: 0}
+  cameraFramingPadding: 1.15
+  minimumCameraDistance: 1
   boardCellVisualPrefab: {fileID: 135422902841736654, guid: 5c84238caef74744b89f15e81b4efd80, type: 3}
   boardVisualSpawnRoot: {fileID: 0}
   boardVisualNormalOffset: 0
