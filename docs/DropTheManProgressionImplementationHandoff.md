@@ -137,7 +137,7 @@ Do not automatically erase unreadable progress to recover; repair/reset needs an
 ## 7. Verification
 
 * Unity 6000.3.17f1, Windows isolated validation host: all 38 new tests passed (18 framework, 20 game).
-  Report: `C:/Users/Gaming/.codex/diagnostics/progression-final-tests.xml`.
+  Local diagnostic report (not bundled): `progression-final-tests.xml`.
 * Full framework and game runtime source compiled in that host with existing DOTween DLL.
 * Runtime test exercises drag/collection, deferred cat completion, deferred hole completion,
   synchronous win save before Next, duplicate callbacks, and loss before hole completion.
@@ -151,16 +151,16 @@ Do not automatically erase unreadable progress to recover; repair/reset needs an
   The temporary host copied asmdef also referenced the host's existing Input System package.
 * September 3: actual prototype compiled successfully after package resolution; all 20 prototype
   Edit Mode tests passed against the published dependency. Result archived at
-  `C:/Users/Gaming/.codex/diagnostics/progression-prototype-tests-2026-09-03.xml`.
+  local diagnostic `progression-prototype-tests-2026-09-03.xml` (not bundled).
 * After the replay amendment: actual prototype recompiled; all 27 Edit Mode tests passed, including
   seven new tests for replay chains, saved-loop identity, pre-win/restart guards, read-only retry,
   catalog-number gaps, inserted unfinished content and single-level replay. Report:
-  `C:/Users/Gaming/.codex/diagnostics/progression-replay-tests-2026-09-03.xml`.
+  local diagnostic `progression-replay-tests-2026-09-03.xml` (not bundled).
 * Gameplay scene Play Mode smoke test passed: Level 1 board/cats/holes and Editor sandbox HUD loaded.
   Stopped without completing a level; no sandbox save was created. Win/stop/reopen acceptance,
   replay/retry UI, player build and target-device filesystem verification remain manual followups.
-* Temporary validation source/assets archived outside the repository under
-  `C:/Users/Gaming/.codex/diagnostics/progression-validation-2026-09-02`; validation-triggered
+* Temporary validation source/assets archived outside the repository as
+  `progression-validation-2026-09-02` (not bundled); validation-triggered
   pipeline asset upgrade reverted.
   No normal profile touched. Unrelated dirty scenes, hole material and `level_3.json` preserved.
 * Gameplay startup smoke repeated successfully after the replay change, without winning or saving.

@@ -20,3 +20,23 @@
 *.mdb
 *.opendb
 *.VC.db
+
+# Local diagnostics, captures, IDE state, and signing material.
+/MemoryCaptures/
+/.gradle/
+/ExportedObj/
+*.log
+*.unityproj
+*.suo
+*.tmp
+*.userprefs
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+!.env.sample
+*.keystore
+*.jks
+*.p12
+*.pfx

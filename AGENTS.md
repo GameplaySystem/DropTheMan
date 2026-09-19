@@ -37,8 +37,8 @@ Examples:
   - `docs/DropTheManMVPRules.md`
   - `docs/DropTheManRuntimeIntegrationDesign.md`
   - `docs/DropTheManPlayableSceneAdapterDesign.md`
-  - `C:/Users/Gaming/Projects/PuzzleFramework/docs/CRITICAL_RULE_CLARIFICATIONS.md`
-  - `C:/Users/Gaming/Projects/PuzzleFramework/docs/IMPLEMENTATION_WATCHLIST.md`
+  - `PuzzleFramework/docs/CRITICAL_RULE_CLARIFICATIONS.md` in the framework repository
+  - `PuzzleFramework/docs/IMPLEMENTATION_WATCHLIST.md` in the framework repository
 - For collection presentation timing tasks, also read:
   - `docs/DropTheManCollectionPresentationTimingDesign.md`
 - For full-hole completion or outcome routing tasks, also read:
@@ -53,7 +53,7 @@ Examples:
   - relevant Content Systems docs
   - relevant Runtime Construction docs
   - Drop The Man level/content docs
-  - `C:/Users/Gaming/Projects/PuzzleFramework/docs/IMPLEMENTATION_WATCHLIST.md`
+  - `PuzzleFramework/docs/IMPLEMENTATION_WATCHLIST.md` in the framework repository
 
 Documentation is the source of truth. If code and docs disagree, report the drift before changing behavior.
 

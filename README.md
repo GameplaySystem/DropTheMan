@@ -1,7 +1,7 @@
 # Drop The Man
 
 A Unity puzzle-game prototype built on the reusable
-[Puzzle Framework](https://github.com/Find-Games/PuzzleFramework). Drag colored holes across the
+[Puzzle Framework](https://github.com/GameplaySystem/PuzzleFramework). Drag colored holes across the
 board, collect matching cats while moving, fill every required hole, and finish the level before
 the timer when one is enabled.
 
@@ -9,6 +9,9 @@ This repository has two purposes: deliver a playable reconstruction of the *Drop
 and act as the first real consumer used to prove or reject abstractions in Puzzle Framework. Generic
 grid, interaction, content, runtime-flow, presentation-foundation, and persistence concerns belong
 to the framework. Hole rules, cat collection, level policy, visuals, and authoring remain here.
+
+**Prototype #1 is development-complete for its current systems-showcase scope.** Final UI, art
+polish, and device acceptance are intentionally deferred, not missing core gameplay features.
 
 ## Current Features
 
@@ -19,6 +22,8 @@ to the framework. Hole rules, cat collection, level policy, visuals, and authori
 - eight concrete hole shapes with quarter-turn footprint resolution and completion presentation
 - modular board visuals, URP stencil apertures, color-specific materials, and dynamic camera framing
 - JSON-authored levels discovered through an ordered Resources catalog
+- validated runtime construction and prefab spawning from level data
+- a closed load/play/win-or-fail/next-or-restart loop with optional countdown timing
 - a dedicated in-game level-authoring scene with placement, erasing, blocked cells, and hole rotation
 - local campaign persistence, completed-level replay, explicit campaign resume, and configurable
   looping after all shipped levels are complete
@@ -40,11 +45,16 @@ to the framework. Hole rules, cat collection, level policy, visuals, and authori
 4. Open `Assets/Scenes/DropTheManDevTest.unity`.
 5. Enter Play Mode and drag a hole with the primary mouse button.
 
+Git must be installed and available to Unity. You do not need a neighboring framework checkout.
+While either repository is private, access requires GitHub authorization; never put credentials
+in the package URL. The manifest and lock file pin framework revision
+`96e9b7751686f2652c0374a40841e74c96c74c9f`.
+
 The gameplay scene loads the first unfinished level from
 `Assets/Resources/DropTheMan/Levels`. Editor Play Mode uses a separate
 `progress.editor.json` sandbox under `Application.persistentDataPath`; it does not write the normal
-player profile. The current gameplay and progression controls are functional development UI and
-will be replaced by authored Canvas/prefab UI before a player-facing build.
+player profile. Gameplay and progression use functional development UI. Authored Canvas/prefab UI
+is deferred until a future presentation pass; it is not required to demonstrate these systems.
 
 ## Level Editor
 
@@ -84,9 +94,10 @@ before the player presses **Next Level**.
 
 ## Tests
 
-Run **Window > General > Test Runner > EditMode** in Unity. The current prototype suite contains 27
-passing tests covering progression policy/session behavior, replay continuation, loop boundaries,
-save failure handling, terminal outcome timing, and Editor profile isolation.
+Run **Window > General > Test Runner > EditMode** in Unity. The last recorded prototype run
+(September 4, 2026) passed 27 tests covering progression policy/session behavior, replay
+continuation, loop boundaries, save failure handling, terminal outcome timing, and Editor profile
+isolation.
 
 Level 3 has also been checked for unique IDs, board bounds, placement overlap, and matching per-color
 hole capacity. Manual visual, replay/relaunch, aspect-ratio, and target-device acceptance checks are
@@ -94,13 +105,14 @@ still tracked separately.
 
 ## Project Status
 
-The core gameplay, content pipeline, authoring foundation, animation integration, and first
-progression slice are implemented. The next production-facing milestone is real Unity UI for the
-gameplay HUD, results, level selection, replay/resume, and save errors, followed by a development
-device build and tuning based on that build.
+Implemented: core gameplay, content loading/construction, authoring, animation integration, and
+local progression. The objective is a functioning engineering portfolio showcase, not a polished
+commercial release. Final UI/art integration, a player-facing build, device testing, and visual
+tuning are deferred. Maintenance and shared-framework regression fixes remain in scope.
 
-See [Drop The Man Remaining Work](https://github.com/Find-Games/PuzzleFramework/blob/main/docs/DropTheManRemainingWork.md)
-for the prioritized finish checklist.
+See [Drop The Man Remaining Work](https://github.com/GameplaySystem/PuzzleFramework/blob/main/docs/DropTheManRemainingWork.md)
+for deferred acceptance work. Detailed design documents describe their own slices; early MVP
+exclusions do not override later delivered features such as progression.
 
 ## Detailed Documentation
 
@@ -115,5 +127,14 @@ for the prioritized finish checklist.
 ## Scope Boundaries
 
 Cloud saves, multiple profiles, rewards/stars, mid-level resume, adaptive endgame, monetization,
-and reusable level-editor extraction are not part of the current finish. Broader abstractions move
+and reusable level-editor extraction are not part of this completed MVP scope. Broader abstractions move
 into Puzzle Framework only after another game demonstrates the same need.
+
+## Rights And Publication
+
+This is a portfolio inspection project, not an invitation for community contributions. No
+open-source license is granted for project-owned code. Third-party components retain their own
+terms; see [third-party notices](THIRD_PARTY_NOTICES.md).
+
+Public visibility would make tracked assets and their history downloadable. Publication is pending
+the code-only/private-art decision recorded in the [publication audit](docs/PublicationReadinessReport.md).
