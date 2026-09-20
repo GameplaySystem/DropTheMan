@@ -1,3 +1,4 @@
+using PuzzleFramework.Interaction;
 using UnityEngine;
 
 namespace DropAwayPrototype.Runtime
@@ -97,7 +98,8 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            _activeHoleToPointerWorldOffset = holeView.WorldPosition - pointerWorldPosition;
+            _activeHoleToPointerWorldOffset = BoardPointerProjection.CaptureOffset(
+                holeView.WorldPosition, pointerWorldPosition);
             _activeHoleView = holeView;
             _isDragging = true;
             _activePointerId = pointerId;
@@ -122,7 +124,8 @@ namespace DropAwayPrototype.Runtime
                 return false;
             }
 
-            Vector3 targetWorldPosition = worldPosition + _activeHoleToPointerWorldOffset;
+            Vector3 targetWorldPosition = BoardPointerProjection.ApplyOffset(
+                worldPosition, _activeHoleToPointerWorldOffset);
             if (_activeHoleView != null && maxDragSpeedUnitsPerSecond > 0f)
             {
                 float maxDistance =
@@ -240,14 +243,13 @@ namespace DropAwayPrototype.Runtime
                 ? boardPlaneOrigin.position
                 : Vector3.zero;
 
-            Plane boardPlane = new(normal, origin);
             Ray ray = inputCamera.ScreenPointToRay(screenPosition);
-            if (!boardPlane.Raycast(ray, out float enter))
+            if (!BoardPointerProjection.TryProject(ray, origin, normal, out Vector3 projected))
             {
                 return false;
             }
 
-            worldPosition = ray.GetPoint(enter) + dragWorldOffset;
+            worldPosition = projected + dragWorldOffset;
             return true;
         }
     }

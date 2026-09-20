@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using PuzzleFramework.CoreBoard;
+using PuzzleFramework.Interaction;
 using UnityEngine;
 
 namespace DropAwayPrototype.Runtime
@@ -477,6 +478,10 @@ namespace DropAwayPrototype.Runtime
             Vector3 toWorldPosition,
             out string blockingReason)
         {
+            FootprintClearanceQuery clearance = new(
+                request.RuntimeModel.FrameworkContext.GridBoard,
+                request.RuntimeModel.FrameworkContext.CellOccupancySystem,
+                committedHoleFootprint);
             IReadOnlyList<SweptFootprintContactGroup> contactGroups =
                 _sweptFootprintHelper.EnumerateContactGroups(
                     new SweptFootprintRequest(
@@ -489,7 +494,7 @@ namespace DropAwayPrototype.Runtime
             {
                 if (TryGetBlockingReason(
                         request,
-                        committedHoleFootprint,
+                        clearance,
                         contactGroups[groupIndex],
                         out blockingReason))
                 {
@@ -547,50 +552,21 @@ namespace DropAwayPrototype.Runtime
 
         private static bool TryGetBlockingReason(
             DropTheManMovementCoordinatorRequest request,
-            HashSet<GridCoordinate> committedHoleFootprint,
+            FootprintClearanceQuery clearance,
             SweptFootprintContactGroup contactGroup,
             out string blockingReason)
         {
+            FootprintClearanceResult structural = clearance.Evaluate(contactGroup.OverlappedCells);
+            if (!structural.IsClear)
+            {
+                blockingReason =
+                    $"Movement footprint reached {structural.Failure} coordinate {structural.BlockingCoordinate}.";
+                return true;
+            }
+
             for (int i = 0; i < contactGroup.OverlappedCells.Count; i++)
             {
                 GridCoordinate coordinate = contactGroup.OverlappedCells[i];
-                if (!request.RuntimeModel.FrameworkContext.GridBoard.IsWithinBounds(coordinate))
-                {
-                    blockingReason =
-                        $"Movement footprint reached out-of-bounds coordinate {coordinate}.";
-                    return true;
-                }
-
-                if (!request.RuntimeModel.FrameworkContext.GridBoard.ContainsCell(coordinate))
-                {
-                    blockingReason =
-                        $"Movement footprint reached inactive structural coordinate {coordinate}.";
-                    return true;
-                }
-
-                if (request.RuntimeModel.FrameworkContext.GridBoard.IsBlocked(coordinate))
-                {
-                    blockingReason =
-                        $"Movement footprint reached blocked structural coordinate {coordinate}.";
-                    return true;
-                }
-
-                if (request.RuntimeModel.FrameworkContext.CellOccupancySystem.IsReserved(coordinate) &&
-                    !committedHoleFootprint.Contains(coordinate))
-                {
-                    blockingReason =
-                        $"Movement footprint reached reserved coordinate {coordinate}.";
-                    return true;
-                }
-
-                if (request.RuntimeModel.FrameworkContext.CellOccupancySystem.IsOccupied(coordinate) &&
-                    !committedHoleFootprint.Contains(coordinate))
-                {
-                    blockingReason =
-                        $"Movement footprint reached occupied coordinate {coordinate}.";
-                    return true;
-                }
-
                 if (request.RuntimeModel.StickmanIndex.TryGet(coordinate, out StickmanRuntimeState stickman) &&
                     stickman.ColorIdentity != request.Hole.ColorIdentity)
                 {

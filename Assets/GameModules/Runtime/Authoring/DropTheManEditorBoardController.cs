@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DropAwayPrototype.Runtime;
+using PuzzleFramework.Content;
 using PuzzleFramework.CoreBoard;
 using PuzzleFramework.Presentation;
 using UnityEngine;
@@ -203,17 +204,13 @@ namespace DropAwayPrototype.Editor
                 return false;
             }
 
-            Plane boardPlane = new(GetBoardNormal(worldLayout), transform.position);
-            if (!boardPlane.Raycast(ray, out float distance))
+            if (!LevelAuthoringCore.TryPickCell(ray, worldLayout, transform.position,
+                    out GridCoordinate picked))
             {
                 return false;
             }
 
-            Vector3 worldPoint = ray.GetPoint(distance);
-            Vector2 boardLocal = worldLayout.WorldToBoardLocal(worldPoint);
-            coordinate = new Vector2Int(
-                Mathf.RoundToInt(boardLocal.x),
-                Mathf.RoundToInt(boardLocal.y));
+            coordinate = new Vector2Int(picked.X, picked.Y);
             return IsWithinBoard(coordinate);
         }
 
@@ -694,24 +691,24 @@ namespace DropAwayPrototype.Editor
                 return true;
             }
 
-            if (FindStickmanAt(coordinate) != null)
+            try
             {
-                Debug.LogWarning(
-                    $"Cannot block coordinate {coordinate} because a stickman is authored there.",
-                    this);
-                return false;
+                LevelAuthoringCore core = BuildAuthoringCore(levelData.BoardWidth, levelData.BoardHeight);
+                AuthoringEditResult result = core.TrySetCellState(
+                    new GridCoordinate(coordinate.x, coordinate.y), AuthoredCellState.Blocked);
+                if (result.Success)
+                {
+                    levelData.BlockedCells.Add(coordinate);
+                    return true;
+                }
+                Debug.LogWarning($"Cannot block coordinate {coordinate}: {result.Reason} " +
+                    $"Affected: {string.Join(", ", result.AffectedItemIds)}.", this);
             }
-
-            if (FindHoleContaining(coordinate) != null)
+            catch (ArgumentException exception)
             {
-                Debug.LogWarning(
-                    $"Cannot block coordinate {coordinate} because a hole footprint uses that cell.",
-                    this);
-                return false;
+                Debug.LogWarning($"Cannot block coordinate {coordinate}: {exception.Message}", this);
             }
-
-            levelData.BlockedCells.Add(coordinate);
-            return true;
+            return false;
         }
 
         private bool PlaceStickman(Vector2Int coordinate)
@@ -811,44 +808,50 @@ namespace DropAwayPrototype.Editor
             IReadOnlyList<Vector2Int> footprintOffsets,
             DropTheManDevHoleData ignoredHole)
         {
-            for (int i = 0; i < footprintOffsets.Count; i++)
+            try
             {
-                Vector2Int coordinate = origin + footprintOffsets[i];
-                if (!IsWithinBoard(coordinate))
-                {
-                    Debug.LogWarning(
-                        $"Cannot place hole at {origin} because footprint cell {coordinate} is outside the board.",
-                        this);
-                    return false;
-                }
+                LevelAuthoringCore core = BuildAuthoringCore(levelData.BoardWidth, levelData.BoardHeight);
+                List<GridCoordinate> offsets = new(footprintOffsets.Count);
+                foreach (Vector2Int offset in footprintOffsets)
+                    offsets.Add(new GridCoordinate(offset.x, offset.y));
+                string id = ignoredHole != null ? ignoredHole.Id : Guid.NewGuid().ToString("N");
+                AuthoringEditResult result = core.TryPlaceOrMove(new AuthoredFootprint(
+                    id, new GridCoordinate(origin.x, origin.y), offsets));
+                if (result.Success) return true;
+                Debug.LogWarning($"Cannot place hole at {origin}: {result.Reason}", this);
+                return false;
+            }
+            catch (ArgumentException exception)
+            {
+                Debug.LogWarning($"Cannot place hole at {origin}: {exception.Message}", this);
+                return false;
+            }
+        }
 
-                if (IsBlocked(coordinate))
-                {
-                    Debug.LogWarning(
-                        $"Cannot place hole at {origin} because footprint cell {coordinate} is blocked.",
-                        this);
-                    return false;
-                }
-
-                if (FindStickmanAt(coordinate) != null)
-                {
-                    Debug.LogWarning(
-                        $"Cannot place hole at {origin} because footprint cell {coordinate} contains a stickman.",
-                        this);
-                    return false;
-                }
-
-                DropTheManDevHoleData overlappingHole = FindHoleContaining(coordinate, ignoredHole);
-                if (overlappingHole != null)
-                {
-                    Debug.LogWarning(
-                        $"Cannot place hole at {origin} because footprint cell {coordinate} overlaps hole '{overlappingHole.Id}'.",
-                        this);
-                    return false;
-                }
+        private LevelAuthoringCore BuildAuthoringCore(int width, int height)
+        {
+            List<AuthoredFootprint> items = new();
+            foreach (DropTheManDevStickmanData stickman in levelData.Stickmen)
+                items.Add(new AuthoredFootprint(stickman.Id,
+                    new GridCoordinate(stickman.Coordinate.x, stickman.Coordinate.y),
+                    new[] { new GridCoordinate(0, 0) }));
+            foreach (DropTheManDevHoleData hole in levelData.Holes)
+            {
+                List<GridCoordinate> offsets = new();
+                foreach (Vector2Int offset in ResolveFootprintOffsets(hole.FootprintOffsets))
+                    offsets.Add(new GridCoordinate(offset.x, offset.y));
+                items.Add(new AuthoredFootprint(hole.Id,
+                    new GridCoordinate(hole.Coordinate.x, hole.Coordinate.y), offsets));
             }
 
-            return true;
+            LevelAuthoringCore core = new(width, height, items);
+            foreach (Vector2Int blocked in levelData.BlockedCells)
+            {
+                AuthoringEditResult result = core.TrySetCellState(
+                    new GridCoordinate(blocked.x, blocked.y), AuthoredCellState.Blocked);
+                if (!result.Success) throw new ArgumentException(result.Reason);
+            }
+            return core;
         }
 
         private bool RemoveStickmanAt(Vector2Int coordinate)
@@ -1262,29 +1265,18 @@ namespace DropAwayPrototype.Editor
             IReadOnlyList<Vector2Int> offsets,
             int quarterTurns)
         {
-            List<Vector2Int> rotatedOffsets = new(offsets.Count);
-            HashSet<Vector2Int> uniqueOffsets = new();
-
-            for (int i = 0; i < offsets.Count; i++)
+            IReadOnlyList<Vector2Int> normalized = ResolveFootprintOffsets(offsets);
+            List<GridCoordinate> rotated = new(normalized.Count);
+            foreach (Vector2Int offset in normalized)
+                rotated.Add(new GridCoordinate(offset.x, offset.y));
+            for (int turn = 0; turn < quarterTurns; turn++)
+                rotated = new List<GridCoordinate>(LevelAuthoringCore.RotateClockwise(rotated));
+            List<Vector2Int> result = new(rotated.Count);
+            foreach (GridCoordinate offset in rotated)
             {
-                Vector2Int rotated = offsets[i];
-                for (int turn = 0; turn < quarterTurns; turn++)
-                {
-                    rotated = new Vector2Int(rotated.y, -rotated.x);
-                }
-
-                if (uniqueOffsets.Add(rotated))
-                {
-                    rotatedOffsets.Add(rotated);
-                }
+                result.Add(new Vector2Int(offset.X, offset.Y));
             }
-
-            if (!uniqueOffsets.Contains(Vector2Int.zero))
-            {
-                rotatedOffsets.Insert(0, Vector2Int.zero);
-            }
-
-            return rotatedOffsets;
+            return result;
         }
 
         private static string GenerateUniqueId(

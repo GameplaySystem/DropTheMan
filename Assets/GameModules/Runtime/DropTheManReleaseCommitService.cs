@@ -118,9 +118,8 @@ namespace DropAwayPrototype.Runtime
         /// <summary>
         /// Attempts release-time snap and committed occupancy transfer for one non-full active hole.
         /// Structural occupancy is mutated only during this release path, never during drag.
-        /// If occupancy transfer fails after old occupancy is released, the service rolls back by
-        /// clearing newly occupied cells, restoring old occupancy, keeping the old committed origin,
-        /// and returning a failure result with the old committed world position.
+        /// Framework occupancy validates the full transfer before mutation. Failure keeps the old
+        /// committed origin/footprint and returns the old committed world position.
         /// </summary>
         public DropTheManReleaseCommitResult CommitRelease(
             DropTheManRuntimeModel runtimeModel,
@@ -203,45 +202,14 @@ namespace DropAwayPrototype.Runtime
             IReadOnlyList<GridCoordinate> newFootprint = hole.Footprint.ResolveCoordinates(snappedOrigin);
             CellOccupancySystem occupancySystem = runtimeModel.FrameworkContext.CellOccupancySystem;
 
-            List<GridCoordinate> releasedOldCoordinates = new(oldFootprint.Count);
-            for (int i = 0; i < oldFootprint.Count; i++)
+            CellOccupancyOperationResult transferResult =
+                occupancySystem.TransferFootprint(oldFootprint, newFootprint);
+            if (!transferResult.Success)
             {
-                CellOccupancyOperationResult releaseResult = occupancySystem.Release(oldFootprint[i]);
-                if (!releaseResult.Success)
-                {
-                    string rollbackFailure =
-                        TryRestoreOldFootprint(occupancySystem, releasedOldCoordinates);
-                    return DropTheManReleaseCommitResult.Failed(
-                        oldCommittedOrigin,
-                        oldCommittedWorldPosition,
-                        BuildFailureReason(
-                            $"Failed to release old committed footprint for hole '{hole.Id}': {releaseResult.FailureReason}",
-                            rollbackFailure));
-                }
-
-                releasedOldCoordinates.Add(oldFootprint[i]);
-            }
-
-            List<GridCoordinate> occupiedNewCoordinates = new(newFootprint.Count);
-            for (int i = 0; i < newFootprint.Count; i++)
-            {
-                CellOccupancyOperationResult occupyResult = occupancySystem.Occupy(newFootprint[i]);
-                if (!occupyResult.Success)
-                {
-                    string rollbackFailure = TryRollbackFailedTransfer(
-                        occupancySystem,
-                        releasedOldCoordinates,
-                        occupiedNewCoordinates);
-
-                    return DropTheManReleaseCommitResult.Failed(
-                        oldCommittedOrigin,
-                        oldCommittedWorldPosition,
-                        BuildFailureReason(
-                            $"Failed to occupy new snapped footprint for hole '{hole.Id}': {occupyResult.FailureReason}",
-                            rollbackFailure));
-                }
-
-                occupiedNewCoordinates.Add(newFootprint[i]);
+                return DropTheManReleaseCommitResult.Failed(
+                    oldCommittedOrigin,
+                    oldCommittedWorldPosition,
+                    $"Could not transfer committed footprint for hole '{hole.Id}': {transferResult.FailureReason}");
             }
 
             hole.MoveTo(snappedOrigin);
@@ -250,59 +218,6 @@ namespace DropAwayPrototype.Runtime
                 true,
                 snappedOrigin,
                 snappedWorldPosition);
-        }
-
-        private static string TryRollbackFailedTransfer(
-            CellOccupancySystem occupancySystem,
-            IReadOnlyList<GridCoordinate> releasedOldCoordinates,
-            IReadOnlyList<GridCoordinate> occupiedNewCoordinates)
-        {
-            List<string> rollbackFailures = new();
-
-            for (int i = occupiedNewCoordinates.Count - 1; i >= 0; i--)
-            {
-                CellOccupancyOperationResult releaseResult =
-                    occupancySystem.Release(occupiedNewCoordinates[i]);
-                if (!releaseResult.Success)
-                {
-                    rollbackFailures.Add(
-                        $"Failed to release partially occupied coordinate {occupiedNewCoordinates[i]}: {releaseResult.FailureReason}");
-                }
-            }
-
-            string restoreFailure = TryRestoreOldFootprint(
-                occupancySystem,
-                releasedOldCoordinates);
-            if (!string.IsNullOrEmpty(restoreFailure))
-            {
-                rollbackFailures.Add(restoreFailure);
-            }
-
-            return rollbackFailures.Count == 0
-                ? string.Empty
-                : string.Join(" | ", rollbackFailures);
-        }
-
-        private static string TryRestoreOldFootprint(
-            CellOccupancySystem occupancySystem,
-            IReadOnlyList<GridCoordinate> releasedOldCoordinates)
-        {
-            List<string> restoreFailures = new();
-
-            for (int i = 0; i < releasedOldCoordinates.Count; i++)
-            {
-                CellOccupancyOperationResult occupyResult =
-                    occupancySystem.Occupy(releasedOldCoordinates[i]);
-                if (!occupyResult.Success)
-                {
-                    restoreFailures.Add(
-                        $"Failed to restore old committed coordinate {releasedOldCoordinates[i]}: {occupyResult.FailureReason}");
-                }
-            }
-
-            return restoreFailures.Count == 0
-                ? string.Empty
-                : string.Join(" | ", restoreFailures);
         }
 
         private static Vector3 ToWorld(
@@ -327,13 +242,5 @@ namespace DropAwayPrototype.Runtime
             return false;
         }
 
-        private static string BuildFailureReason(
-            string primaryFailure,
-            string rollbackFailure)
-        {
-            return string.IsNullOrEmpty(rollbackFailure)
-                ? primaryFailure
-                : $"{primaryFailure} Rollback issue: {rollbackFailure}";
-        }
     }
 }
