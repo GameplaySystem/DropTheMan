@@ -1,5 +1,53 @@
 # Drop The Man Level Editor Design
 
+## Approved second-consumer framework migration
+
+The ownership and phase notes below describe the original one-game decision. They remain the
+baseline for DTM-specific tools and behavior, but the second consumer now justifies completing
+PuzzleFramework's generic authoring foundation. `LevelAuthoringCore` provides shared picking,
+cell-state checks, footprint fit and rotation math. Before this checkpoint, the working DTM
+controller rebuilt a temporary core for individual checks; that partial use was not the final
+architecture.
+
+The approved migration keeps this dedicated Play-mode scene, HUD, hotkeys, hole/stickman modes,
+palette, color previews, JSON format, camera framing and explicit resize-with-warning behavior.
+It maps the DTM authored board and placed items into one live framework authoring session, then
+uses that session for generic cell picking, selection, structural edits, footprint placement and
+rotation, erase, and board-view composition. The DTM adapter must keep its game payload and the
+shared session synchronized: reconstruct the session from serialized game data on scene enable
+or import, treat it as structural authority during editing, and publish game data only after an
+edit is accepted. It stages imports before replacing either. Its resize adapter may
+explicitly prune out-of-bounds content and warn before applying the shared resize operation.
+The shared core itself must never silently prune, and CBE uses its reject-invalidating-edit path.
+
+DTM does not gain a placed-item move UI, inactive-cell painting or a gameplay play-test bridge
+merely because the generic core supports those operations. Concrete migration steps and the
+second-consumer acceptance rule are recorded in the framework
+`LevelEditorFoundation` specification and the CBE editor technical design. The framework's
+session layer is implemented; this checkpoint migrates DTM before CBE editor tooling begins.
+
+### Adoption checkpoint
+
+`DropTheManEditorBoardController` now keeps one live `LevelAuthoringCore` for structural cells,
+footprints, selection and generic placement/rotation/erase checks. It restores that session on
+enable or import, then updates serialized DTM payload only after accepted edits. Board views
+derive their participating cells and walls from the session. Picking and visual placement use an
+explicit center-anchored `GridWorldLayout`. The JSON provider, HUD, hotkeys, preview prefabs and
+camera framing remain DTM-owned and unchanged.
+
+Resize inspects shared structural impact, explicitly removes the affected DTM entries, clears
+cropped blocked cells, applies the shared resize and keeps the existing warning. Direct Inspector
+resizing still uses a small DTM cleanup path before rebuilding the session because Inspector
+changes bypass runtime commands. That fallback's hole-fit traversal is the remaining duplicated
+geometry; it should not be moved into framework policy.
+
+A fresh Unity 6000.3.17f1 project copy compiled and passed all 35 DTM Edit Mode tests, covering
+all three shipped level imports, placement/removal, hole rotation, resize/prune, an edited JSON
+save/load round trip, center-anchored picking and the configured editor scene's board visuals.
+The original checkout's generated `Library/Bee` still references three removed source files and
+does not compile even after Unity-managed reimport. No generated folder was manually changed or
+deleted; this is a local cache issue, not a source failure in a clean project.
+
 ## Purpose
 
 This document defines the first concrete `Drop The Man` level editor direction.

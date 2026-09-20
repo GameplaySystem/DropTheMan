@@ -10,8 +10,8 @@ namespace DropAwayPrototype.Editor
 {
     /// <summary>
     /// Scene-attachable visual authoring shell for Drop The Man.
-    /// It owns editor-time board visualization and authored data only; SceneView tooling stays
-    /// in an editor-only wrapper.
+    /// Its live framework session owns board structure and footprint placement. Serialized DTM
+    /// data retains game payload and JSON ownership; SceneView tooling stays in an editor wrapper.
     /// </summary>
     [AddComponentMenu("Drop Away/Drop The Man Editor Board Controller")]
     [DisallowMultipleComponent]
@@ -56,6 +56,7 @@ namespace DropAwayPrototype.Editor
 
         private Vector2Int _lastBoardSize = new(-1, -1);
         private bool _refreshQueued;
+        private LevelAuthoringCore _authoringSession;
 
         public DropTheManEditorConfig Config => config;
         public DropTheManDevLevelData LevelData => levelData;
@@ -66,9 +67,12 @@ namespace DropAwayPrototype.Editor
         public int SelectedHoleRotationDegrees => selectedHoleQuarterTurns * 90;
         public bool CaptureSceneInputWhenSelected => captureSceneInputWhenSelected;
         public bool ShowSceneOverlay => showSceneOverlay;
+        /// <summary>Selected structural item ID, shared by click-to-rotate and erase behavior.</summary>
+        public string SelectedAuthoredItemId => _authoringSession?.SelectedItemId;
 
         private void OnEnable()
         {
+            _authoringSession = null;
             if (Application.isPlaying)
             {
                 EnsurePlayModeRuntimeShell();
@@ -80,6 +84,8 @@ namespace DropAwayPrototype.Editor
 
         private void OnValidate()
         {
+            // Inspector edits change serialized game data outside the live session.
+            _authoringSession = null;
             if (Application.isPlaying)
             {
                 return;
@@ -129,7 +135,11 @@ namespace DropAwayPrototype.Editor
                 return;
             }
 
-            HandleResizeCleanup();
+            if (!TryEnsureAuthoringSession(out failureReason))
+            {
+                Debug.LogWarning($"Drop The Man editor session could not be restored: {failureReason}", this);
+                return;
+            }
             EnsureVisualRoots();
             RebuildBoardVisuals(worldLayout);
             RebuildPlacementVisuals(worldLayout);
@@ -198,13 +208,13 @@ namespace DropAwayPrototype.Editor
         public bool TryGetCellFromRay(Ray ray, out Vector2Int coordinate)
         {
             coordinate = default;
-
-            if (!TryCreateWorldLayout(out GridWorldLayout worldLayout, out _))
+            if (!TryEnsureAuthoringSession(out _) ||
+                !TryCreateWorldLayout(out GridWorldLayout worldLayout, out _))
             {
                 return false;
             }
 
-            if (!LevelAuthoringCore.TryPickCell(ray, worldLayout, transform.position,
+            if (!BoardAuthoringPicker.TryPickCell(ray, worldLayout, transform.position,
                     out GridCoordinate picked))
             {
                 return false;
@@ -216,6 +226,11 @@ namespace DropAwayPrototype.Editor
 
         public bool ApplyPrimaryActionAt(Vector2Int coordinate)
         {
+            if (!TryEnsureAuthoringSession(out string failureReason))
+            {
+                Debug.LogWarning($"Cannot edit Drop The Man level: {failureReason}", this);
+                return false;
+            }
             return currentMode switch
             {
                 DropTheManEditorPlacementMode.Obstacle => ToggleBlockedCell(coordinate),
@@ -228,9 +243,14 @@ namespace DropAwayPrototype.Editor
 
         public bool ApplyEraseActionAt(Vector2Int coordinate)
         {
+            if (!TryEnsureAuthoringSession(out string failureReason))
+            {
+                Debug.LogWarning($"Cannot erase Drop The Man content: {failureReason}", this);
+                return false;
+            }
             return currentMode switch
             {
-                DropTheManEditorPlacementMode.Obstacle => levelData.BlockedCells.Remove(coordinate),
+                DropTheManEditorPlacementMode.Obstacle => EraseBlockedCell(coordinate),
                 DropTheManEditorPlacementMode.Stickman => RemoveStickmanAt(coordinate),
                 DropTheManEditorPlacementMode.Hole => RemoveHoleAtOrContaining(coordinate),
                 DropTheManEditorPlacementMode.HoleRotation => RemoveHoleAtOrContaining(coordinate),
@@ -240,7 +260,11 @@ namespace DropAwayPrototype.Editor
 
         public bool ApplyBoardDimensions(int width, int height)
         {
-            EnsureLevelDataInitialized();
+            if (!TryEnsureAuthoringSession(out string failureReason))
+            {
+                Debug.LogWarning($"Cannot resize Drop The Man board: {failureReason}", this);
+                return false;
+            }
 
             int clampedWidth = Mathf.Max(1, width);
             int clampedHeight = Mathf.Max(1, height);
@@ -249,8 +273,7 @@ namespace DropAwayPrototype.Editor
                 return false;
             }
 
-            levelData.BoardWidth = clampedWidth;
-            levelData.BoardHeight = clampedHeight;
+            if (!TryResizeAuthoringSession(clampedWidth, clampedHeight)) return false;
             RefreshVisuals();
             return true;
         }
@@ -261,7 +284,12 @@ namespace DropAwayPrototype.Editor
             out string jsonText,
             out string failureReason)
         {
-            EnsureLevelDataInitialized();
+            if (!TryEnsureAuthoringSession(out failureReason))
+            {
+                resolvedAbsolutePath = string.Empty;
+                jsonText = string.Empty;
+                return false;
+            }
 
             return DropTheManEditorJsonExportUtility.TryExportToFile(
                 levelData,
@@ -285,7 +313,10 @@ namespace DropAwayPrototype.Editor
                 return false;
             }
 
-            ApplyImportedLevelData(importedLevelData);
+            DropTheManDevLevelData stagedData = CloneLevelData(importedLevelData);
+            if (!TryCreateAuthoringSession(stagedData, out LevelAuthoringCore stagedSession,
+                    out failureReason)) return false;
+            ApplyImportedLevelData(stagedData, stagedSession);
             failureReason = string.Empty;
             return true;
         }
@@ -304,6 +335,8 @@ namespace DropAwayPrototype.Editor
             {
                 levelData.DisplayName = displayName.Trim();
             }
+            if (TryEnsureAuthoringSession(out _))
+                _authoringSession.SetMetadata(levelData.LevelId, levelData.DisplayName, 1);
         }
 
         public void SetTimerSettings(bool enabled, float durationSeconds, float warningThresholdSeconds)
@@ -314,6 +347,9 @@ namespace DropAwayPrototype.Editor
                 ? Mathf.Max(0.01f, durationSeconds)
                 : Mathf.Max(0f, durationSeconds);
             levelData.TimerWarningThresholdSeconds = Mathf.Max(0f, warningThresholdSeconds);
+            if (TryEnsureAuthoringSession(out _))
+                _authoringSession.SetTimer(levelData.TimerEnabled, TimerMode.Countdown,
+                    levelData.TimerDurationSeconds, levelData.TimerWarningThresholdSeconds);
         }
 
         private void EnsureLevelDataInitialized()
@@ -352,10 +388,151 @@ namespace DropAwayPrototype.Editor
             }
         }
 
-        private void ApplyImportedLevelData(DropTheManDevLevelData importedLevelData)
+        private void ApplyImportedLevelData(DropTheManDevLevelData importedLevelData,
+            LevelAuthoringCore importedSession)
         {
-            levelData = CloneLevelData(importedLevelData);
+            levelData = importedLevelData;
+            _authoringSession = importedSession;
+            _lastBoardSize = new Vector2Int(levelData.BoardWidth, levelData.BoardHeight);
             RefreshVisuals();
+        }
+
+        private bool TryEnsureAuthoringSession(out string failureReason)
+        {
+            if (_authoringSession != null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            EnsureLevelDataInitialized();
+            // This path also covers direct Inspector resizing of serialized scene data.
+            HandleResizeCleanup();
+            if (!TryCreateAuthoringSession(levelData, out LevelAuthoringCore session,
+                    out failureReason)) return false;
+            _authoringSession = session;
+            return true;
+        }
+
+        private static bool TryCreateAuthoringSession(DropTheManDevLevelData data,
+            out LevelAuthoringCore session, out string failureReason)
+        {
+            // Construct a complete candidate first, so a failed import never replaces live state.
+            session = null;
+            if (data == null || data.BoardWidth <= 0 || data.BoardHeight <= 0)
+            {
+                failureReason = "Board dimensions must be positive.";
+                return false;
+            }
+
+            try
+            {
+                HashSet<Vector2Int> blocked = new();
+                foreach (Vector2Int coordinate in data.BlockedCells)
+                    if (coordinate.x < 0 || coordinate.x >= data.BoardWidth ||
+                        coordinate.y < 0 || coordinate.y >= data.BoardHeight || !blocked.Add(coordinate))
+                    {
+                        failureReason = $"Invalid or duplicate blocked coordinate {coordinate}.";
+                        return false;
+                    }
+
+                BoardDefinitionData board = new() { Width = data.BoardWidth, Height = data.BoardHeight };
+                for (int y = 0; y < data.BoardHeight; y++)
+                    for (int x = 0; x < data.BoardWidth; x++)
+                    {
+                        Vector2Int coordinate = new(x, y);
+                        board.Cells.Add(new CellDefinitionData
+                        {
+                            Coordinate = new CellCoordinateData { X = x, Y = y },
+                            CellState = blocked.Contains(coordinate)
+                                ? AuthoredCellState.Blocked : AuthoredCellState.Active
+                        });
+                    }
+
+                List<AuthoredFootprint> items = new();
+                foreach (DropTheManDevStickmanData stickman in data.Stickmen)
+                    items.Add(new AuthoredFootprint(stickman.Id,
+                        new GridCoordinate(stickman.Coordinate.x, stickman.Coordinate.y),
+                        new[] { new GridCoordinate(0, 0) }));
+                foreach (DropTheManDevHoleData hole in data.Holes)
+                    items.Add(new AuthoredFootprint(hole.Id,
+                        new GridCoordinate(hole.Coordinate.x, hole.Coordinate.y),
+                        ToGridOffsets(ResolveFootprintOffsets(hole.FootprintOffsets))));
+
+                return LevelAuthoringCore.TryRestore(board, items,
+                    new LevelMetadata { LevelId = data.LevelId, DisplayName = data.DisplayName },
+                    new TimerDefinitionData
+                    {
+                        IsEnabled = data.TimerEnabled,
+                        Mode = TimerMode.Countdown,
+                        DurationSeconds = data.TimerDurationSeconds,
+                        WarningThresholdSeconds = data.TimerWarningThresholdSeconds
+                    }, out session, out failureReason);
+            }
+            catch (Exception exception)
+            {
+                failureReason = exception.Message;
+                return false;
+            }
+        }
+
+        private bool TryResizeAuthoringSession(int width, int height)
+        {
+            // DTM explicitly prunes reported conflicts; the framework itself never chooses that policy.
+            AuthoringStructuralImpact impact = _authoringSession.InspectResize(width, height);
+            if (!string.IsNullOrEmpty(impact.Reason))
+            {
+                Debug.LogWarning($"Cannot resize Drop The Man board: {impact.Reason}", this);
+                return false;
+            }
+
+            DropTheManDevLevelData original = CloneLevelData(levelData);
+            HashSet<string> removedIds = new(impact.AffectedItemIds);
+            int removedStickmen = levelData.Stickmen.RemoveAll(item => removedIds.Contains(item.Id));
+            int removedHoles = levelData.Holes.RemoveAll(item => removedIds.Contains(item.Id));
+            foreach (string id in removedIds) _authoringSession.Erase(id);
+
+            int removedBlockedCells = 0;
+            foreach (GridCoordinate cell in impact.AffectedCells)
+            {
+                _authoringSession.TrySetCellState(cell, AuthoredCellState.Active);
+                if (levelData.BlockedCells.Remove(new Vector2Int(cell.X, cell.Y))) removedBlockedCells++;
+            }
+
+            AuthoringEditResult resized = _authoringSession.TryResize(width, height);
+            if (!resized.Success)
+            {
+                // Defensive rollback: a failed shared resize must not leave payload and session apart.
+                levelData = original;
+                TryCreateAuthoringSession(original, out _authoringSession, out _);
+                Debug.LogWarning($"Cannot resize Drop The Man board: {resized.Reason}", this);
+                return false;
+            }
+
+            levelData.BoardWidth = width;
+            levelData.BoardHeight = height;
+            _lastBoardSize = new Vector2Int(width, height);
+            if (removedBlockedCells + removedStickmen + removedHoles > 0)
+                Debug.LogWarning($"Drop The Man editor resized to {width}x{height} and " +
+                    $"removed {removedBlockedCells} blocked cells, {removedStickmen} stickmen, " +
+                    $"and {removedHoles} holes that no longer fit the board.", this);
+            return true;
+        }
+
+        private static List<GridCoordinate> ToGridOffsets(IReadOnlyList<Vector2Int> offsets)
+        {
+            List<GridCoordinate> result = new(offsets.Count);
+            foreach (Vector2Int offset in offsets)
+                result.Add(new GridCoordinate(offset.x, offset.y));
+            return result;
+        }
+
+        private static List<Vector2Int> ToVectorOffsets(IReadOnlyList<GridCoordinate> offsets)
+        {
+            List<Vector2Int> result = new(offsets.Count);
+            foreach (GridCoordinate offset in offsets)
+                result.Add(new Vector2Int(offset.X, offset.Y));
+            return result;
         }
 
         private void ClampSelection()
@@ -501,9 +678,9 @@ namespace DropAwayPrototype.Editor
             Quaternion boardRotation = BuildBoardRotation(worldLayout);
             Vector3 rootScale = new(cellSize.x, 1f, cellSize.y);
 
-            for (int y = 0; y < levelData.BoardHeight; y++)
+            for (int y = 0; y < _authoringSession.Height; y++)
             {
-                for (int x = 0; x < levelData.BoardWidth; x++)
+                for (int x = 0; x < _authoringSession.Width; x++)
                 {
                     GameObject cellObject = CreateCellVisualObject();
                     cellObject.transform.SetParent(boardVisualRoot, worldPositionStays: false);
@@ -533,13 +710,8 @@ namespace DropAwayPrototype.Editor
         {
             try
             {
-                List<GridCoordinate> participatingCoordinates =
-                    DropTheManBoardVisualParticipationMapper.CreateFromEditorData(
-                        levelData.BoardWidth,
-                        levelData.BoardHeight,
-                        levelData.BlockedCells);
-                WallGenerationResult boundary =
-                    new WallGenerationSystem().Generate(participatingCoordinates);
+                WallGenerationResult boundary = _authoringSession.CreateBoundary(
+                    state => state == AuthoredCellState.Active);
                 ModularBoardVisualPlan plan =
                     new ModularBoardVisualPlanner().CreatePlan(boundary);
                 ModularBoardVisualBuilder builder = new();
@@ -686,63 +858,62 @@ namespace DropAwayPrototype.Editor
 
         private bool ToggleBlockedCell(Vector2Int coordinate)
         {
-            if (levelData.BlockedCells.Remove(coordinate))
+            GridCoordinate cell = new(coordinate.x, coordinate.y);
+            if (_authoringSession.GetCellState(cell) == AuthoredCellState.Blocked)
             {
+                if (!_authoringSession.TrySetCellState(cell, AuthoredCellState.Active).Success)
+                    return false;
+                levelData.BlockedCells.Remove(coordinate);
                 return true;
             }
 
-            try
+            AuthoringEditResult result = _authoringSession.TrySetCellState(
+                cell, AuthoredCellState.Blocked);
+            if (result.Success)
             {
-                LevelAuthoringCore core = BuildAuthoringCore(levelData.BoardWidth, levelData.BoardHeight);
-                AuthoringEditResult result = core.TrySetCellState(
-                    new GridCoordinate(coordinate.x, coordinate.y), AuthoredCellState.Blocked);
-                if (result.Success)
-                {
-                    levelData.BlockedCells.Add(coordinate);
-                    return true;
-                }
-                Debug.LogWarning($"Cannot block coordinate {coordinate}: {result.Reason} " +
-                    $"Affected: {string.Join(", ", result.AffectedItemIds)}.", this);
+                levelData.BlockedCells.Add(coordinate);
+                return true;
             }
-            catch (ArgumentException exception)
-            {
-                Debug.LogWarning($"Cannot block coordinate {coordinate}: {exception.Message}", this);
-            }
+            Debug.LogWarning($"Cannot block coordinate {coordinate}: {result.Reason} " +
+                $"Affected: {string.Join(", ", result.AffectedItemIds)}.", this);
             return false;
+        }
+
+        private bool EraseBlockedCell(Vector2Int coordinate)
+        {
+            if (_authoringSession.GetCellState(new GridCoordinate(coordinate.x, coordinate.y)) !=
+                AuthoredCellState.Blocked) return false;
+            AuthoringEditResult result = _authoringSession.TrySetCellState(
+                new GridCoordinate(coordinate.x, coordinate.y), AuthoredCellState.Active);
+            return result.Success && levelData.BlockedCells.Remove(coordinate);
         }
 
         private bool PlaceStickman(Vector2Int coordinate)
         {
-            if (IsBlocked(coordinate))
-            {
-                Debug.LogWarning(
-                    $"Cannot place a stickman on blocked coordinate {coordinate}.",
-                    this);
-                return false;
-            }
-
-            if (FindHoleContaining(coordinate) != null)
-            {
-                Debug.LogWarning(
-                    $"Cannot place a stickman on coordinate {coordinate} because a hole footprint already uses it.",
-                    this);
-                return false;
-            }
-
             DropTheManDevStickmanData existingStickman = FindStickmanAt(coordinate);
             if (existingStickman != null)
             {
                 existingStickman.ColorIdentity = NormalizeColorIdentity(selectedColor);
+                _authoringSession.SelectItem(existingStickman.Id);
                 return true;
             }
 
-            levelData.Stickmen.Add(
-                new DropTheManDevStickmanData
-                {
-                    Id = GenerateUniqueId(levelData.Stickmen, "stickman"),
-                    Coordinate = coordinate,
-                    ColorIdentity = NormalizeColorIdentity(selectedColor)
-                });
+            string id = GenerateUniqueId("stickman");
+            AuthoringEditResult result = _authoringSession.TryPlaceOrMove(new AuthoredFootprint(
+                id, new GridCoordinate(coordinate.x, coordinate.y),
+                new[] { new GridCoordinate(0, 0) }));
+            if (!result.Success)
+            {
+                Debug.LogWarning($"Cannot place a stickman at {coordinate}: {result.Reason}", this);
+                return false;
+            }
+            levelData.Stickmen.Add(new DropTheManDevStickmanData
+            {
+                Id = id,
+                Coordinate = coordinate,
+                ColorIdentity = NormalizeColorIdentity(selectedColor)
+            });
+            _authoringSession.SelectItem(id);
             return true;
         }
 
@@ -760,8 +931,13 @@ namespace DropAwayPrototype.Editor
             List<Vector2Int> rotatedOffsets = ResolveFootprintOffsets(paletteEntry.footprintOffsets);
 
             DropTheManDevHoleData existingOriginHole = FindHoleByOrigin(coordinate);
-            if (!CanPlaceHole(coordinate, rotatedOffsets, existingOriginHole))
+            string id = existingOriginHole != null
+                ? existingOriginHole.Id : GenerateUniqueId("hole");
+            AuthoringEditResult placement = _authoringSession.TryPlaceOrMove(new AuthoredFootprint(
+                id, new GridCoordinate(coordinate.x, coordinate.y), ToGridOffsets(rotatedOffsets)));
+            if (!placement.Success)
             {
+                Debug.LogWarning($"Cannot place hole at {coordinate}: {placement.Reason}", this);
                 return false;
             }
 
@@ -769,89 +945,43 @@ namespace DropAwayPrototype.Editor
             {
                 existingOriginHole.ColorIdentity = NormalizeColorIdentity(selectedColor);
                 existingOriginHole.FootprintOffsets = rotatedOffsets;
+                _authoringSession.SelectItem(id);
                 return true;
             }
 
             levelData.Holes.Add(
                 new DropTheManDevHoleData
                 {
-                    Id = GenerateUniqueId(levelData.Holes, "hole"),
+                    Id = id,
                     Coordinate = coordinate,
                     ColorIdentity = NormalizeColorIdentity(selectedColor),
                     FootprintOffsets = rotatedOffsets
                 });
+            _authoringSession.SelectItem(id);
             return true;
         }
 
         private bool RotateHoleAtOrContaining(Vector2Int coordinate)
         {
-            DropTheManDevHoleData hole = FindHoleContaining(coordinate);
+            GridCoordinate cell = new(coordinate.x, coordinate.y);
+            if (!_authoringSession.TryFindItemAtCell(cell, out AuthoredFootprint selected))
+                return false;
+            DropTheManDevHoleData hole = FindHoleById(selected.Id);
             if (hole == null)
             {
                 return false;
             }
 
-            List<Vector2Int> rotatedOffsets = RotateOffsets(
-                ResolveFootprintOffsets(hole.FootprintOffsets),
-                1);
-            if (!CanPlaceHole(hole.Coordinate, rotatedOffsets, hole))
+            _authoringSession.SelectItem(selected.Id);
+            AuthoringEditResult rotation = _authoringSession.TryRotateItemClockwise(selected.Id);
+            if (!rotation.Success)
             {
+                Debug.LogWarning($"Cannot rotate hole '{hole.Id}': {rotation.Reason}", this);
                 return false;
             }
-
-            hole.FootprintOffsets = rotatedOffsets;
+            _authoringSession.TryGetItem(selected.Id, out AuthoredFootprint rotated);
+            hole.FootprintOffsets = ToVectorOffsets(rotated.Offsets);
             return true;
-        }
-
-        private bool CanPlaceHole(
-            Vector2Int origin,
-            IReadOnlyList<Vector2Int> footprintOffsets,
-            DropTheManDevHoleData ignoredHole)
-        {
-            try
-            {
-                LevelAuthoringCore core = BuildAuthoringCore(levelData.BoardWidth, levelData.BoardHeight);
-                List<GridCoordinate> offsets = new(footprintOffsets.Count);
-                foreach (Vector2Int offset in footprintOffsets)
-                    offsets.Add(new GridCoordinate(offset.x, offset.y));
-                string id = ignoredHole != null ? ignoredHole.Id : Guid.NewGuid().ToString("N");
-                AuthoringEditResult result = core.TryPlaceOrMove(new AuthoredFootprint(
-                    id, new GridCoordinate(origin.x, origin.y), offsets));
-                if (result.Success) return true;
-                Debug.LogWarning($"Cannot place hole at {origin}: {result.Reason}", this);
-                return false;
-            }
-            catch (ArgumentException exception)
-            {
-                Debug.LogWarning($"Cannot place hole at {origin}: {exception.Message}", this);
-                return false;
-            }
-        }
-
-        private LevelAuthoringCore BuildAuthoringCore(int width, int height)
-        {
-            List<AuthoredFootprint> items = new();
-            foreach (DropTheManDevStickmanData stickman in levelData.Stickmen)
-                items.Add(new AuthoredFootprint(stickman.Id,
-                    new GridCoordinate(stickman.Coordinate.x, stickman.Coordinate.y),
-                    new[] { new GridCoordinate(0, 0) }));
-            foreach (DropTheManDevHoleData hole in levelData.Holes)
-            {
-                List<GridCoordinate> offsets = new();
-                foreach (Vector2Int offset in ResolveFootprintOffsets(hole.FootprintOffsets))
-                    offsets.Add(new GridCoordinate(offset.x, offset.y));
-                items.Add(new AuthoredFootprint(hole.Id,
-                    new GridCoordinate(hole.Coordinate.x, hole.Coordinate.y), offsets));
-            }
-
-            LevelAuthoringCore core = new(width, height, items);
-            foreach (Vector2Int blocked in levelData.BlockedCells)
-            {
-                AuthoringEditResult result = core.TrySetCellState(
-                    new GridCoordinate(blocked.x, blocked.y), AuthoredCellState.Blocked);
-                if (!result.Success) throw new ArgumentException(result.Reason);
-            }
-            return core;
         }
 
         private bool RemoveStickmanAt(Vector2Int coordinate)
@@ -860,6 +990,7 @@ namespace DropAwayPrototype.Editor
             {
                 if (levelData.Stickmen[i].Coordinate == coordinate)
                 {
+                    if (!_authoringSession.Erase(levelData.Stickmen[i].Id)) return false;
                     levelData.Stickmen.RemoveAt(i);
                     return true;
                 }
@@ -870,17 +1001,12 @@ namespace DropAwayPrototype.Editor
 
         private bool RemoveHoleAtOrContaining(Vector2Int coordinate)
         {
-            for (int i = 0; i < levelData.Holes.Count; i++)
-            {
-                if (levelData.Holes[i].Coordinate == coordinate ||
-                    HoleContainsCoordinate(levelData.Holes[i], coordinate))
-                {
-                    levelData.Holes.RemoveAt(i);
-                    return true;
-                }
-            }
-
-            return false;
+            if (!_authoringSession.TryFindItemAtCell(new GridCoordinate(coordinate.x, coordinate.y),
+                    out AuthoredFootprint item)) return false;
+            DropTheManDevHoleData hole = FindHoleById(item.Id);
+            if (hole == null || !_authoringSession.Erase(item.Id)) return false;
+            levelData.Holes.Remove(hole);
+            return true;
         }
 
         private DropTheManDevStickmanData FindStickmanAt(Vector2Int coordinate)
@@ -906,6 +1032,13 @@ namespace DropAwayPrototype.Editor
                 }
             }
 
+            return null;
+        }
+
+        private DropTheManDevHoleData FindHoleById(string id)
+        {
+            foreach (DropTheManDevHoleData hole in levelData.Holes)
+                if (hole.Id == id) return hole;
             return null;
         }
 
@@ -966,15 +1099,18 @@ namespace DropAwayPrototype.Editor
 
         private bool IsBlocked(Vector2Int coordinate)
         {
-            return levelData.BlockedCells.Contains(coordinate);
+            return _authoringSession != null
+                ? _authoringSession.GetCellState(new GridCoordinate(coordinate.x, coordinate.y)) ==
+                  AuthoredCellState.Blocked
+                : levelData.BlockedCells.Contains(coordinate);
         }
 
         private bool IsWithinBoard(Vector2Int coordinate)
         {
             return coordinate.x >= 0 &&
-                   coordinate.x < levelData.BoardWidth &&
+                   coordinate.x < (_authoringSession?.Width ?? levelData.BoardWidth) &&
                    coordinate.y >= 0 &&
-                   coordinate.y < levelData.BoardHeight;
+                   coordinate.y < (_authoringSession?.Height ?? levelData.BoardHeight);
         }
 
         private bool TryCreateWorldLayout(
@@ -987,7 +1123,8 @@ namespace DropAwayPrototype.Editor
                     transform.position,
                     cellSize,
                     boardGridXAxis,
-                    boardGridYAxis);
+                    boardGridYAxis,
+                    GridCellAnchor.Center);
                 failureReason = string.Empty;
                 return true;
             }
@@ -1001,8 +1138,7 @@ namespace DropAwayPrototype.Editor
 
         private Vector3 GetCellCenterWorld(GridWorldLayout worldLayout, Vector2Int coordinate)
         {
-            return worldLayout.BoardLocalToWorld(
-                new Vector2(coordinate.x, coordinate.y));
+            return worldLayout.CellCenterToWorld(new GridCoordinate(coordinate.x, coordinate.y));
         }
 
         private void PositionEditorCamera(GridWorldLayout worldLayout)
@@ -1279,37 +1415,11 @@ namespace DropAwayPrototype.Editor
             return result;
         }
 
-        private static string GenerateUniqueId(
-            IReadOnlyList<DropTheManDevHoleData> holes,
-            string prefix)
-        {
-            HashSet<string> ids = new();
-            for (int i = 0; i < holes.Count; i++)
-            {
-                ids.Add(holes[i].Id);
-            }
-
-            return GenerateUniqueId(ids, prefix);
-        }
-
-        private static string GenerateUniqueId(
-            IReadOnlyList<DropTheManDevStickmanData> stickmen,
-            string prefix)
-        {
-            HashSet<string> ids = new();
-            for (int i = 0; i < stickmen.Count; i++)
-            {
-                ids.Add(stickmen[i].Id);
-            }
-
-            return GenerateUniqueId(ids, prefix);
-        }
-
-        private static string GenerateUniqueId(HashSet<string> existingIds, string prefix)
+        private string GenerateUniqueId(string prefix)
         {
             int suffix = 1;
             string candidate = $"{prefix}_{suffix:000}";
-            while (existingIds.Contains(candidate))
+            while (_authoringSession.TryGetItem(candidate, out _))
             {
                 suffix++;
                 candidate = $"{prefix}_{suffix:000}";

@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.gaming.puzzleframework": "https://github.com/GameplaySystem/PuzzleFramework.git?path=/Packages/com.gaming.puzzleframework#9de0d8e5f4e8b0314d6cad0398c9cf2828cb00f6",
+    "com.gaming.puzzleframework": "https://github.com/GameplaySystem/PuzzleFramework.git?path=/Packages/com.gaming.puzzleframework#c485272d5e0b9764d67fe1b07a5e9af6429623f7",
     "com.unity.ide.visualstudio": "2.0.26",
     "com.unity.multiplayer.center": "1.0.1",
     "com.unity.recorder": "5.1.6",
