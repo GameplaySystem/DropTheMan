@@ -48,7 +48,7 @@ polish, and device acceptance are intentionally deferred, not missing core gamep
 Git must be installed and available to Unity. You do not need a neighboring framework checkout.
 While either repository is private, access requires GitHub authorization; never put credentials
 in the package URL. The manifest and lock file pin framework revision
-`96e9b7751686f2652c0374a40841e74c96c74c9f`.
+`9de0d8e5f4e8b0314d6cad0398c9cf2828cb00f6`.
 
 The gameplay scene loads the first unfinished level from
 `Assets/Resources/DropTheMan/Levels`. Editor Play Mode uses a separate
@@ -94,10 +94,10 @@ before the player presses **Next Level**.
 
 ## Tests
 
-Run **Window > General > Test Runner > EditMode** in Unity. The last recorded prototype run
-(September 4, 2026) passed 27 tests covering progression policy/session behavior, replay
-continuation, loop boundaries, save failure handling, terminal outcome timing, and Editor profile
-isolation.
+Run **Window > General > Test Runner > EditMode** in Unity. After adopting the shared movement and
+authoring primitives, the 27 existing prototype Edit Mode tests and one focused editor migration
+test passed. Coverage includes progression policy/session behavior, replay continuation, loop
+boundaries, save failure handling, terminal outcome timing, and Editor profile isolation.
 
 Level 3 has also been checked for unique IDs, board bounds, placement overlap, and matching per-color
 hole capacity. Manual visual, replay/relaunch, aspect-ratio, and target-device acceptance checks are
