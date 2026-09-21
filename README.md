@@ -6,10 +6,6 @@ multi-cell holes across a board, collects matching cats, fills each hole to its 
 and completes the level before an optional timer expires. The prototype is also the first concrete
 consumer used to test which systems belong in the reusable framework.
 
-> **Gameplay GIF pending:** the final capture will show continuous hole dragging, matching-color
-> collection, falling-cat presentation, hole completion, and the level result loop. No asset preview
-> is substituted for running gameplay.
-
 ## Key Features
 
 - continuous pointer dragging constrained by footprint, board bounds, blocked cells, and occupancy
@@ -64,8 +60,8 @@ flowchart LR
 
 The scene adapters translate Unity input and views into framework requests. The framework stores
 generic state and validates reusable operations; DTM decides whether a cat can be collected, when a
-hole is complete, when a level is won, and when progress should be saved. A GitDiagram repository
-map will be added during the media pass, with this focused explanation retained beside it.
+hole is complete, when a level is won, and when progress should be saved. The diagram emphasizes
+that ownership boundary instead of exposing every repository dependency.
 
 ## Framework vs. Game-Specific Code
 
@@ -184,9 +180,9 @@ Unity project copy.
 
 ## What I Built / Role
 
-This is my independent portfolio engineering project. I designed and implemented the gameplay
-architecture, movement and collection rules, runtime composition, custom authoring workflow,
-progression policy, presentation integration, content pipeline, tests, and framework adoption.
+This is my independent portfolio engineering project. I designed and directed the gameplay
+architecture, reviewed and integrated implementations, built and debugged movement, collection,
+authoring, progression, and presentation systems, and own the content pipeline and test strategy.
 
 ## Running the Project
 
@@ -201,18 +197,6 @@ levels load from `Assets/Resources/DropTheMan/Levels`. To use the editor, open
 `Assets/Scenes/DropTheManLevelEditor.unity` instead.
 
 Run prototype tests through **Window > General > Test Runner > EditMode**.
-
-## Screenshots / Media
-
-The final portfolio media pass should add:
-
-- a gameplay GIF near the top
-- one level-editor capture showing cat/hole placement and rotation
-- one modular-board/stencil close-up
-- one side-by-side image with CBE demonstrating the shared board or authoring foundation
-- the GitDiagram export with the focused explanation above
-
-Only footage captured from the running prototype will be used.
 
 ## Documentation
 
