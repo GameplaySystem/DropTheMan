@@ -1,140 +1,230 @@
 # Drop The Man
 
-A Unity puzzle-game prototype built on the reusable
-[Puzzle Framework](https://github.com/GameplaySystem/PuzzleFramework). Drag colored holes across the
-board, collect matching cats while moving, fill every required hole, and finish the level before
-the timer when one is enabled.
+Drop The Man is a playable Unity puzzle prototype built on
+[Puzzle Framework](https://github.com/GameplaySystem/PuzzleFramework). The player drags colored,
+multi-cell holes across a board, collects matching cats, fills each hole to its required capacity,
+and completes the level before an optional timer expires. The prototype is also the first concrete
+consumer used to test which systems belong in the reusable framework.
 
-This repository has two purposes: deliver a playable reconstruction of the *Drop Away* core loop,
-and act as the first real consumer used to prove or reject abstractions in Puzzle Framework. Generic
-grid, interaction, content, runtime-flow, presentation-foundation, and persistence concerns belong
-to the framework. Hole rules, cat collection, level policy, visuals, and authoring remain here.
+> **Gameplay GIF pending:** the final capture will show continuous hole dragging, matching-color
+> collection, falling-cat presentation, hole completion, and the level result loop. No asset preview
+> is substituted for running gameplay.
 
-**Prototype #1 is development-complete for its current systems-showcase scope.** Final UI, art
-polish, and device acceptance are intentionally deferred, not missing core gameplay features.
+## Key Features
 
-## Current Features
-
-- freeform pointer dragging constrained by grid shape, board bounds, blockers, occupancy, and color
-- same-color collection during movement with capacity derived from hole footprint size
-- asynchronous cat presentation with six falling variants, live moving-hole socket tracking,
-  shrinking, and callback-driven fill
-- eight concrete hole shapes with quarter-turn footprint resolution and completion presentation
-- modular board visuals, URP stencil apertures, color-specific materials, and dynamic camera framing
-- JSON-authored levels discovered through an ordered Resources catalog
-- validated runtime construction and prefab spawning from level data
-- a closed load/play/win-or-fail/next-or-restart loop with optional countdown timing
-- a dedicated in-game level-authoring scene with placement, erasing, blocked cells, and hole rotation
-- local campaign persistence, completed-level replay, explicit campaign resume, and configurable
-  looping after all shipped levels are complete
+- continuous pointer dragging constrained by footprint, board bounds, blocked cells, and occupancy
+- matching-color collection during movement
+- capacity derived from the authored hole footprint
+- asynchronous cat approach/fall/shrink presentation with moving-hole socket tracking
+- eight configured hole shapes with authored quarter-turn orientations
+- modular URP board visuals, stencil apertures, color materials, and board-size camera framing
+- JSON-authored levels loaded through an ordered Resources catalog
+- validated runtime construction and prefab spawning from authored data
+- load, play, win/fail, restart, next-level, replay, and campaign-resume flows
+- versioned local progression with a separate Editor play-mode profile
+- a dedicated play-mode level editor for board size, blocked cells, cats, holes, colors, rotation,
+  JSON import, and JSON export
 - three authored prototype levels
 
-## Technology
+## Gameplay / Demo
 
-- Unity `6000.3.17f1`
-- Universal Render Pipeline `17.3.0`
-- C# and Unity assembly definitions
-- DOTween Core for prototype-owned collection and hole presentation
-- Puzzle Framework pinned through Unity Package Manager to an immutable Git commit
+Open `Assets/Scenes/DropTheManDevTest.unity` and enter Play Mode. Drag a hole with the primary
+mouse button. A cat is eligible only when its color matches, its cell is reached during valid
+movement, and the hole still has capacity. A level win is accepted after all required holes
+complete, then progression is saved before the player advances.
 
-## Getting Started
+## Architecture Overview
 
-1. Clone this repository.
-2. Open the repository root in Unity `6000.3.17f1`.
-3. Allow Unity Package Manager to resolve the pinned Puzzle Framework revision.
-4. Open `Assets/Scenes/DropTheManDevTest.unity`.
-5. Enter Play Mode and drag a hole with the primary mouse button.
+| System | Responsibility |
+| --- | --- |
+| Framework board and occupancy | Stores coordinates, cell structure, hole footprints, cats, blockers, and occupancy facts. |
+| Framework interaction | Provides generic drag, snap, swept movement, and clearance primitives. |
+| DTM runtime controller | Applies color, collection, capacity, completion, and outcome rules. |
+| Content and construction | Loads the framework level envelope, interprets DTM payload data, validates it, and creates runtime objects. |
+| Runtime flow | Uses framework game-state/timer services while DTM owns exact win, replay, and campaign policy. |
+| Presentation | DTM owns cat animation, hole completion, materials, prefabs, camera behavior, HUD, and DOTween timing. |
+| Progression | Framework persists versioned progress; DTM decides unlock order, replay behavior, resume, and looping. |
+| Level editor | Shared framework authoring state plus DTM-specific cat/hole tools and payload conversion. |
 
-Git must be installed and available to Unity. You do not need a neighboring framework checkout.
-While either repository is private, access requires GitHub authorization; never put credentials
-in the package URL. The manifest and lock file pin framework revision
-`9de0d8e5f4e8b0314d6cad0398c9cf2828cb00f6`.
+## Architecture Diagram
 
-The gameplay scene loads the first unfinished level from
-`Assets/Resources/DropTheMan/Levels`. Editor Play Mode uses a separate
-`progress.editor.json` sandbox under `Application.persistentDataPath`; it does not write the normal
-player profile. Gameplay and progression use functional development UI. Authored Canvas/prefab UI
-is deferred until a future presentation pass; it is not required to demonstrate these systems.
+```mermaid
+flowchart LR
+    Input[Pointer input] --> Scene[DTM scene adapters]
+    Scene --> Rules[DTM movement and collection rules]
+    Rules --> Board[Framework board, shape, occupancy]
+    Rules --> Flow[Framework game state and timer]
+    Levels[JSON + Resources catalog] --> Build[Validated runtime construction]
+    Build --> Board
+    Build --> Views[DTM prefabs and presentation]
+    Rules --> Views
+    Flow --> Progress[DTM progression policy]
+    Progress --> Save[Framework progress persistence]
+```
 
-## Level Editor
+The scene adapters translate Unity input and views into framework requests. The framework stores
+generic state and validates reusable operations; DTM decides whether a cat can be collected, when a
+hole is complete, when a level is won, and when progress should be saved. A GitDiagram repository
+map will be added during the media pass, with this focused explanation retained beside it.
 
-Open `Assets/Scenes/DropTheManLevelEditor.unity` and enter Play Mode. The primary authoring workflow
-uses the runtime HUD plus these shortcuts:
+## Framework vs. Game-Specific Code
+
+| Reusable Puzzle Framework | Drop The Man |
+| --- | --- |
+| grid coordinates, board cells, footprints, occupancy, walls | cats, holes, sockets, and capacity meaning |
+| drag/sweep/snap and structural clearance | matching-color collection and hole movement policy |
+| level envelope, catalog, JSON transport, construction context | DTM payload schema, validation, prefab selection, and spawning |
+| game-state and timer lifecycle | completion rules, exact outcome timing, restart/next/replay policy |
+| color identity and modular board planning | concrete materials, stencil hole visuals, animation, HUD, and camera |
+| authoring core, picking, placement, rotation, erase | cat/hole tools, warned prune-on-resize, and DTM JSON mapping |
+
+## Reusable Systems Demonstrated
+
+This prototype originally proved the framework's grid, occupancy, drag, content, construction,
+runtime-flow, color, board-visual, and persistence foundations. It now also consumes the shared live
+authoring core extracted after Color Block Escape supplied a second editor use case.
+
+The same systems behave differently in CBE: DTM collects matching cats into capacity-bearing holes,
+while CBE moves solid blocks toward matching exits and progressively releases occupancy. That
+difference is why the framework exposes mechanics and facts instead of puzzle-specific rules.
+
+## Level Creation / Editor Tooling
+
+Open `Assets/Scenes/DropTheManLevelEditor.unity` and enter Play Mode.
 
 | Input | Action |
 | --- | --- |
-| `O` | Blocked-cell mode |
-| `M` | Cat placement mode |
-| `H` | Hole placement mode |
-| `R` | Rotate an already placed hole on click |
-| `0`-`9` | Select a configured color slot |
-| Left click | Apply the active placement action |
-| Right click | Erase when right-click erase is enabled |
+| `O` | blocked-cell mode |
+| `M` | cat placement mode |
+| `H` | hole placement mode |
+| `R` | rotate an already placed hole when valid |
+| `0`–`9` | choose a configured color slot |
+| Left click | apply the selected authoring action |
+| Right click | erase where the current tool supports it |
 
-Level JSON can be imported/exported through the editor HUD. Shipped content belongs in
-`Assets/Resources/DropTheMan/Levels` and uses stable canonical IDs such as `Level 1`; existing IDs
-must not be repurposed merely to reorder content.
+The editor uses `GridCellAnchor.Center`, matching DTM's board visuals. Board resize keeps the
+existing warned prune behavior. Save/load preserves the established DTM JSON format.
 
-## Architecture
-
-```text
-Pointer/authoring input
-        |
-Game-owned scene adapters and Drop The Man rules
-        |
-Puzzle Framework requests, state, validation, and persistence
-        |
-Game-owned views, animation, tweening, UI, and authored assets
+```mermaid
+flowchart LR
+    Editor[Play-mode DTM editor] --> Session[Shared LevelAuthoringCore]
+    Session --> DTMData[DTM authored cats and holes]
+    DTMData --> JSON[Level JSON]
+    JSON --> Catalog[Resources level catalog]
+    Catalog --> Validation[Framework + DTM validation]
+    Validation --> Runtime[Gameplay runtime construction]
 ```
 
-The framework does not interpret holes or cats, determine this game's win condition, or own its
-replay/loop policy. Runtime victory is accepted only after all required holes complete; collection
-overlap or a cat entering its animation is not sufficient. Progress is saved on the accepted win,
-before the player presses **Next Level**.
+The tool exists to create and revise test levels without manually editing scene objects or JSON,
+while keeping gameplay runtime construction as the authority.
 
-## Tests
+## Technical Decisions
 
-Run **Window > General > Test Runner > EditMode** in Unity. After adopting the shared movement and
-authoring primitives, the 27 existing prototype Edit Mode tests and one focused editor migration
-test passed. Coverage includes progression policy/session behavior, replay continuation, loop
-boundaries, save failure handling, terminal outcome timing, and Editor profile isolation.
+1. **Hole and cat rules stay in DTM.** Their meaning is specific to this puzzle and would couple the
+   framework to one game.
+2. **Movement and occupancy are composed from framework services.** DTM adds collection policy
+   around generic board queries instead of embedding collection inside grid code.
+3. **Authored content and runtime objects are separate.** JSON remains stable while runtime
+   construction creates mutable state and concrete prefabs.
+4. **Completion follows accepted gameplay facts.** A visual overlap or animation start does not
+   decide collection, hole completion, or victory.
+5. **Editor migration preserved the game workflow.** DTM adopted the shared live authoring core
+   without changing its JSON, visuals, tools, or prune-on-resize policy.
 
-Level 3 has also been checked for unique IDs, board bounds, placement overlap, and matching per-color
-hole capacity. Manual visual, replay/relaunch, aspect-ratio, and target-device acceptance checks are
-still tracked separately.
+## Performance Considerations
 
-## Project Status
+- Board movement and collection queries use logical cells and footprints rather than Rigidbody
+  collision as gameplay authority.
+- Scene-level controllers sample input and advance flow; logical cats and holes do not each own a
+  separate `Update` loop.
+- DOTween sequences are stopped on teardown and restart so stale animation callbacks cannot mutate a
+  new session.
+- The project does not publish frame-time, memory, or device benchmark claims yet.
+- Object pooling is not presented as an implemented DTM feature.
 
-Implemented: core gameplay, content loading/construction, authoring, animation integration, and
-local progression. The objective is a functioning engineering portfolio showcase, not a polished
-commercial release. Final UI/art integration, a player-facing build, device testing, and visual
-tuning are deferred. Maintenance and shared-framework regression fixes remain in scope.
+## Project Structure
 
-See [Drop The Man Remaining Work](https://github.com/GameplaySystem/PuzzleFramework/blob/main/docs/DropTheManRemainingWork.md)
-for deferred acceptance work. Detailed design documents describe their own slices; early MVP
-exclusions do not override later delivered features such as progression.
+```text
+Assets/
+  GameModules/
+    Runtime/       DTM gameplay, scene adapters, presentation, authoring
+    Editor/        Setup utilities for DTM assets and scenes
+    Levels/        Game-owned level data helpers
+    Tests/         Prototype Edit Mode tests
+  Resources/
+    DropTheMan/Levels/   Shipped JSON levels
+  RuntimeAssets/        Board, cat, hole, material, and animation assets
+  Scenes/
+    DropTheManDevTest.unity
+    DropTheManLevelEditor.unity
+Packages/
+  manifest.json         Immutable Puzzle Framework dependency
+docs/                   DTM rules, designs, and implementation handoffs
+```
 
-## Detailed Documentation
+## Technologies
+
+- Unity `6000.3.17f1`
+- C#
+- Universal Render Pipeline `17.3.0`
+- DOTween Core
+- Unity Recorder `5.1.6`
+- Unity Test Framework
+- Puzzle Framework installed through a full Git commit SHA
+
+## Current Status
+
+The current systems-showcase MVP is development-complete. Core gameplay, runtime construction,
+three levels, progression, presentation integration, and level authoring are implemented. Final
+player-facing UI/art polish, target-device testing, aspect-ratio acceptance, and a distributable
+portfolio build remain deferred. DTM stays active as a framework regression target.
+
+The latest shared-authoring migration verification passed all 35 DTM Edit Mode tests in a clean
+Unity project copy.
+
+## What I Built / Role
+
+This is my independent portfolio engineering project. I designed and implemented the gameplay
+architecture, movement and collection rules, runtime composition, custom authoring workflow,
+progression policy, presentation integration, content pipeline, tests, and framework adoption.
+
+## Running the Project
+
+1. Clone the repository.
+2. Open the repository root with Unity `6000.3.17f1`.
+3. Allow Unity Package Manager to resolve the pinned Puzzle Framework Git dependency.
+4. Open `Assets/Scenes/DropTheManDevTest.unity`.
+5. Enter Play Mode and drag a hole with the primary mouse button.
+
+Git must be available to Unity. A neighboring framework checkout is not required. The shipped
+levels load from `Assets/Resources/DropTheMan/Levels`. To use the editor, open
+`Assets/Scenes/DropTheManLevelEditor.unity` instead.
+
+Run prototype tests through **Window > General > Test Runner > EditMode**.
+
+## Screenshots / Media
+
+The final portfolio media pass should add:
+
+- a gameplay GIF near the top
+- one level-editor capture showing cat/hole placement and rotation
+- one modular-board/stencil close-up
+- one side-by-side image with CBE demonstrating the shared board or authoring foundation
+- the GitDiagram export with the focused explanation above
+
+Only footage captured from the running prototype will be used.
+
+## Documentation
 
 - [MVP rules](docs/DropTheManMVPRules.md)
 - [Movement and collection rules](docs/DropTheManMovementAndCollectionRules.md)
 - [Runtime integration](docs/DropTheManRuntimeIntegrationDesign.md)
 - [Level editor design](docs/DropTheManLevelEditorDesign.md)
 - [Progression design](docs/DropTheManProgressionDesign.md)
-- [Progression implementation handoff](docs/DropTheManProgressionImplementationHandoff.md)
-- [Cat animation integration handoff](docs/DropTheManCatAnimationIntegrationHandoff.md)
+- [Publication audit](docs/PublicationReadinessReport.md)
 
-## Scope Boundaries
+## Rights and Publication
 
-Cloud saves, multiple profiles, rewards/stars, mid-level resume, adaptive endgame, monetization,
-and reusable level-editor extraction are not part of this completed MVP scope. Broader abstractions move
-into Puzzle Framework only after another game demonstrates the same need.
-
-## Rights And Publication
-
-This is a portfolio inspection project, not an invitation for community contributions. No
-open-source license is granted for project-owned code. Third-party components retain their own
-terms; see [third-party notices](THIRD_PARTY_NOTICES.md).
-
-Public visibility would make tracked assets and their history downloadable. Publication is pending
-the code-only/private-art decision recorded in the [publication audit](docs/PublicationReadinessReport.md).
+This is a portfolio inspection project rather than an open-source package. No license is granted
+for project-owned code or assets. Third-party components retain their own terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
