@@ -214,8 +214,10 @@ Approved framing rule:
 * apply configurable framing padding so presentation can keep clear space around the board
 * do not use blocked cells, holes, or stickmen to calculate the framing center
 
-This remains prototype-owned authoring presentation. It must not become editor content data or
-framework gameplay state.
+The resolution-aware board-fit calculation is shared presentation infrastructure in
+PuzzleFramework because DTM and CBE both consume it. DTM still owns its authored camera rotation,
+field of view, framing padding, minimum distance, and the decision to reframe after resize. Camera
+configuration must not become editor content data or framework gameplay state.
 
 ---
 
