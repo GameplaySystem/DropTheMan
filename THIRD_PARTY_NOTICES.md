@@ -33,5 +33,5 @@ that package. Unity-derived shaders/materials remain subject to any applicable U
 The owner identifies the cat, animations, hole/board models, and textures as artist-created.
 The owner also prefers that external visitors cannot download those raw assets. Public GitHub
 repositories cannot enforce that restriction. Do not interpret this notice as permission to
-publish the artwork or its historical revisions. Keep this playable repository private until
-the publication approach in the [audit report](docs/PublicationReadinessReport.md) is resolved.
+publish the artwork or its historical revisions. Confirm asset publication permission separately
+before making this playable repository public.

@@ -205,7 +205,6 @@ Run prototype tests through **Window > General > Test Runner > EditMode**.
 - [Runtime integration](docs/DropTheManRuntimeIntegrationDesign.md)
 - [Level editor design](docs/DropTheManLevelEditorDesign.md)
 - [Progression design](docs/DropTheManProgressionDesign.md)
-- [Publication audit](docs/PublicationReadinessReport.md)
 
 ## Rights and Publication
 

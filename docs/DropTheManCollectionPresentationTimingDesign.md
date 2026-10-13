@@ -622,8 +622,8 @@ September 2 verification passed for all six active controller motions and early 
 rendered pose comparisons, 36 shuffle-bag assignments and moving-target tweens, and 20 actual
 level collections through hole completion and win. Restart mid-fall and next-level reload passed.
 The cat tint now targets only its configured body material slot, leaving textured white/details
-materials untouched. See `DropTheManCatAnimationIntegrationHandoff.md` for the maintained setup
-commands, verification scope, and remaining visual checks.
+materials untouched. The runtime setup keeps the model, avatar, imported clips, and controller
+consistent; verify those asset bindings in the Unity editor after artist asset changes.
 
 ---
 

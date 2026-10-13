@@ -77,5 +77,5 @@ Edit Mode tests passed against it, following the original 38-test isolated valid
 tests cover the approved replay continuation amendment, including saved-loop identity and retries.
 The gameplay scene starts successfully with the Editor sandbox HUD. Stopped without completing a
 level or creating a profile, leaving the owner's win/quit/reopen check fresh. No scenes or normal
-save files changed. Owner approved the scoped progression commit/push on September 3. See
-`DropTheManProgressionImplementationHandoff.md` for contracts and verification details.
+save files changed. The framework owns persistence contracts while this module owns campaign order,
+replay, and resume policy. The implementation is verified by the progression Edit Mode tests.
