@@ -1,37 +1,46 @@
 {
     "FormatVersion": 1,
     "LevelId": "Level 1",
-    "DisplayName": "Drop The Man Dev Minimal",
+    "DisplayName": "1",
     "Board": {
         "Width": 5,
         "Height": 5,
-        "BlockedCells": []
+        "BlockedCells": [
+            {
+                "X": 2,
+                "Y": 2
+            }
+        ]
     },
     "Timer": {
-        "Enabled": false,
+        "Enabled": true,
         "DurationSeconds": 60.0,
         "WarningThresholdSeconds": 0.0
     },
     "Holes": [
         {
             "Id": "hole_001",
-            "Color": "Slot1",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 0,
-                "Y": 3
+                "X": 3,
+                "Y": 0
             },
             "FootprintOffsets": [
                 {
                     "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
                     "Y": 0
                 }
             ]
         },
         {
             "Id": "hole_002",
-            "Color": "Slot7",
+            "Color": "Slot1",
             "Coordinate": {
-                "X": 4,
+                "X": 0,
                 "Y": 2
             },
             "FootprintOffsets": [
@@ -45,18 +54,26 @@
     "Stickmen": [
         {
             "Id": "stickman_001",
-            "Color": "Slot1",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 2,
-                "Y": 3
+                "X": 0,
+                "Y": 4
             }
         },
         {
             "Id": "stickman_002",
-            "Color": "Slot7",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 2,
-                "Y": 2
+                "X": 1,
+                "Y": 4
+            }
+        },
+        {
+            "Id": "stickman_003",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 4,
+                "Y": 3
             }
         }
     ]

@@ -1,43 +1,68 @@
 {
     "FormatVersion": 1,
     "LevelId": "Level 2",
-    "DisplayName": "Drop The Man Dev Minimal",
+    "DisplayName": "2",
     "Board": {
-        "Width": 5,
-        "Height": 5,
-        "BlockedCells": []
+        "Width": 6,
+        "Height": 6,
+        "BlockedCells": [
+            {
+                "X": 2,
+                "Y": 2
+            },
+            {
+                "X": 2,
+                "Y": 3
+            }
+        ]
     },
     "Timer": {
-        "Enabled": false,
-        "DurationSeconds": 60.0,
+        "Enabled": true,
+        "DurationSeconds": 30.0,
         "WarningThresholdSeconds": 0.0
     },
     "Holes": [
         {
-            "Id": "hole_001",
-            "Color": "Slot2",
+            "Id": "hole_002",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 0,
-                "Y": 4
+                "X": 4,
+                "Y": 0
             },
             "FootprintOffsets": [
                 {
                     "X": 0,
                     "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
                 }
             ]
         },
         {
-            "Id": "hole_002",
-            "Color": "Slot5",
+            "Id": "hole_001",
+            "Color": "Slot1",
             "Coordinate": {
-                "X": 4,
-                "Y": 3
+                "X": 0,
+                "Y": 0
             },
             "FootprintOffsets": [
                 {
                     "X": 0,
                     "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
                 }
             ]
         }
@@ -45,18 +70,42 @@
     "Stickmen": [
         {
             "Id": "stickman_001",
-            "Color": "Slot5",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 2,
-                "Y": 2
+                "X": 0,
+                "Y": 4
             }
         },
         {
             "Id": "stickman_002",
-            "Color": "Slot2",
+            "Color": "Slot0",
             "Coordinate": {
-                "X": 2,
+                "X": 1,
                 "Y": 4
+            }
+        },
+        {
+            "Id": "stickman_003",
+            "Color": "Slot1",
+            "Coordinate": {
+                "X": 4,
+                "Y": 3
+            }
+        },
+        {
+            "Id": "stickman_004",
+            "Color": "Slot0",
+            "Coordinate": {
+                "X": 1,
+                "Y": 5
+            }
+        },
+        {
+            "Id": "stickman_005",
+            "Color": "Slot0",
+            "Coordinate": {
+                "X": 0,
+                "Y": 5
             }
         }
     ]
