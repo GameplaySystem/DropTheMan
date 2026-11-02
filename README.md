@@ -6,6 +6,11 @@ multi-cell holes across a board, collects matching cats, fills each hole to its 
 and completes the level before an optional timer expires. The prototype is also the first concrete
 consumer used to test which systems belong in the reusable framework.
 
+## Showcase Videos
+
+- **[Gameplay Showcase](https://youtube.com/shorts/QkdXlsT2eZM?feature=share)**
+- **[Level Editor Showcase](https://youtu.be/4jjk2oQ1NC4)**
+
 ## Key Features
 
 - continuous pointer dragging constrained by footprint, board bounds, blocked cells, and occupancy
@@ -20,7 +25,7 @@ consumer used to test which systems belong in the reusable framework.
 - versioned local progression with a separate Editor play-mode profile
 - a dedicated play-mode level editor for board size, blocked cells, cats, holes, colors, rotation,
   JSON import, and JSON export
-- three authored prototype levels
+- six authored prototype levels
 
 ## Gameplay / Demo
 
@@ -171,8 +176,8 @@ docs/                   DTM rules, designs, and implementation handoffs
 ## Current Status
 
 The current systems-showcase MVP is development-complete. Core gameplay, runtime construction,
-three levels, progression, presentation integration, and level authoring are implemented. Final
-player-facing UI/art polish, target-device testing, aspect-ratio acceptance, and a distributable
+six levels, progression, presentation integration, authored gameplay UI, and level authoring are
+implemented. Final art polish, target-device testing, aspect-ratio acceptance, and a distributable
 portfolio build remain deferred. DTM stays active as a framework regression target.
 
 The latest shared-authoring migration verification passed all 35 DTM Edit Mode tests in a clean
