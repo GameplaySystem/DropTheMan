@@ -2,6 +2,10 @@
 
 ## Purpose
 
+This document is authoritative for the victory predicate, timer-loss interpretation, and terminal
+arbitration. It consumes completion facts from `DropTheManFullHoleCompletionFlowDesign.md` and is
+wired by `DropTheManRuntimeIntegrationDesign.md`; scene adapters do not decide outcomes.
+
 This document defines the narrow prototype-owned outcome-routing design for the first playable `DropTheMan` slice.
 
 It reconciles the MVP win predicate and defines how later runtime code should route:

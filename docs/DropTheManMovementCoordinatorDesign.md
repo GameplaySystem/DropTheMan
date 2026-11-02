@@ -2,6 +2,10 @@
 
 ## Purpose
 
+`DropTheManMovementAndCollectionRules.md` is authoritative for gameplay semantics. This document
+defines the coordinator's algorithm and data-flow implementation of those rules; it must not
+create alternative collection, capacity, snap, or terminal-outcome behavior.
+
 This document resolves the remaining deterministic implementation-strategy decisions for the first playable `DropTheMan` movement and collection coordinator.
 
 This is a technical design document.
@@ -12,7 +16,7 @@ Read alongside:
 
 * `docs/DropTheManMovementAndCollectionRules.md`
 * `docs/DropTheManMovementEdgeCaseChecklist.md`
-* `docs/DropTheManMVPGameModuleRequirements.md`
+* `docs/DropTheManMVPRules.md`
 
 Do not implement code from this document without review.
 
@@ -272,26 +276,22 @@ When a blocked group is found:
 
 ## 5. Capacity Fill Mid-Sweep
 
+Capacity lifecycle semantics are owned by `DropTheManMovementAndCollectionRules.md`: reservation
+is immediately non-blocking, capacity fills only after presentation completion, and a newly full
+hole stops normal dragging and begins completion. The coordinator's responsibility is to preserve
+deterministic candidate ordering and stop later traversal when the session reports that the hole
+has become full.
+
 ### Chosen Policy
 
-Capacity can interrupt a valid sweep mid-processing.
-
-Rule:
-
-1. Process collectible candidates in deterministic order inside valid contact groups.
-2. On each accepted collectible:
-   * increment fill immediately
-   * mark collectible `Collecting` immediately
-3. As soon as remaining capacity reaches zero:
-   * mark hole `Full`
-   * stop accepting further collectibles
-   * stop further traversal
-   * begin full-hole completion flow
-4. Any unprocessed collectibles remain `Available`
+The coordinator processes candidates in the deterministic order defined by the canonical rules
+document. It must support later traversal interruption when the drag session reports a newly full
+hole, leaving unprocessed candidates available. It does not decide when reservation becomes fill
+or when presentation changes lifecycle state.
 
 ### Why This Is Acceptable For MVP
 
-* it matches the approved gameplay rule
+* it preserves the approved reservation/presentation lifecycle
 * it avoids overfill ambiguity
 * it keeps leftover collectibles available for future valid collectors
 

@@ -9,19 +9,24 @@ It is not a replacement for:
 * `docs/DropTheManMVPRules.md`
 * `docs/DropTheManMovementAndCollectionRules.md`
 
+`DropTheManMovementAndCollectionRules.md` is the authoritative gameplay-semantics source; this
+checklist contains verification scenarios only.
+
 Its job is narrower:
 
-* isolate decisions that still block coordinator implementation
-* convert the remaining edge cases into testable review scenarios
+* convert canonical rules into testable regression and review scenarios
 * keep architecture-boundary risks visible while implementation proceeds
 
 Do not use this document to silently redefine gameplay rules.
 
 ---
 
-## Implementation-Blocking Decisions
+## Historical Decision Inputs
 
-These items should be resolved before implementing the movement and collection coordinator because they directly affect deterministic gameplay truth.
+The approved gameplay semantics now live in `DropTheManMovementAndCollectionRules.md`. The notes
+below preserve why the checklist exists and identify the implementation inputs it exercises; they
+do not independently define rules. For exact sweep and coordinator mechanics, use
+`DropTheManMovementCoordinatorDesign.md`.
 
 ### 1. Exact swept cell enumeration strategy for continuous freeform movement
 

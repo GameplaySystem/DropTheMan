@@ -2,6 +2,11 @@
 
 ## Purpose
 
+`DropTheManMovementAndCollectionRules.md` is authoritative for movement and collection semantics.
+This document owns only the non-full release transaction, rollback, snap validity, and committed
+occupancy transfer. Release must not redefine or trigger collection, capacity, completion, or
+outcome rules.
+
 This document defines the smallest safe release-time flow for a non-full dragged hole in `DropTheMan`.
 
 Its job is narrow:

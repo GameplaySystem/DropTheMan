@@ -29,25 +29,8 @@ This design does not add:
 
 ## Historical MVP Rule
 
-The original synchronous MVP proof used:
-
-```text
-same-color target cell entered or overlapped
-    ->
-collection accepted immediately
-    ->
-stickman enters Collecting immediately
-    ->
-hole fill count increases immediately
-    ->
-if capacity is reached, hole becomes Full immediately
-```
-
-That rule is documented in:
-
-* `DropTheManMovementAndCollectionRules.md`
-* `DropTheManMVPRules.md`
-* `CRITICAL_RULE_CLARIFICATIONS.md`
+The original synchronous MVP proof accepted a matching target and applied its capacity effect
+before presentation completed. It is retained here only as context for the timing change.
 
 The reservation/threshold implementation supersedes that immediate-fill rule. Current gameplay
 reserves capacity first and fills it only on collection presentation completion.
@@ -505,25 +488,12 @@ This is the smallest model that matches the final visual target without moving g
 
 ---
 
-## Required Follow-Up Documentation Changes
+## Consolidation Status
 
-If this design is approved, update the older rule docs that currently say:
-
-```text
-hole fill count increases immediately
-collectible enters Collecting immediately
-capacity fills immediately
-```
-
-Those should be replaced with:
-
-```text
-reservation happens immediately
-visual collection starts at threshold
-capacity fills on collection presentation completion
-```
-
-Do not silently leave both models active in source-of-truth docs.
+`DropTheManMovementAndCollectionRules.md` now carries the canonical semantics: reservation is
+immediate and non-blocking, visual collection starts at the configured threshold, and capacity
+fills on collection-presentation completion. Historical immediate-fill notes in this document are
+context for the design change only and are not active rules.
 
 ---
 

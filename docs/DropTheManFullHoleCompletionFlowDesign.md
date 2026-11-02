@@ -2,6 +2,12 @@
 
 ## Purpose
 
+This document is authoritative for the full-hole lifecycle and completion transaction. Movement and
+collection semantics remain in `DropTheManMovementAndCollectionRules.md`; runtime composition and
+scene-facing presentation are defined by `DropTheManRuntimeIntegrationDesign.md` and
+`DropTheManPlayableSceneAdapterDesign.md`; terminal routing is defined by
+`DropTheManOutcomeRoutingDesign.md`.
+
 This document defines the smallest safe prototype-owned completion flow for a hole that becomes `Full` during drag in `DropTheMan`.
 
 Its job is narrow:

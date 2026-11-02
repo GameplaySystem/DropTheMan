@@ -2,6 +2,12 @@
 
 ## Purpose
 
+This is the authoritative Unity scene-facing adapter design. Cross-system composition belongs to
+`DropTheManRuntimeIntegrationDesign.md`; full-hole completion belongs to
+`DropTheManFullHoleCompletionFlowDesign.md`; terminal arbitration belongs to
+`DropTheManOutcomeRoutingDesign.md`. Scene adapters forward facts and apply authoritative results;
+they do not define those gameplay rules.
+
 This document defines the narrow Unity scene-adapter design for the first playable `DropTheMan` prototype scene.
 
 It sits on top of the already implemented runtime integration foundation:

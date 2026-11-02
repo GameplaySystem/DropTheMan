@@ -2,6 +2,11 @@
 
 ## Purpose
 
+This document is subordinate to `DropTheManMovementAndCollectionRules.md` for gameplay semantics.
+It defines only drag-session lifecycle, accepted-position ownership, duplicate-update protection,
+and visual synchronization; it must not redefine movement, collection, capacity, snap, or outcome
+rules.
+
 This document defines the prototype-owned drag-session owner that will connect player drag input to the existing `DropTheManMovementCoordinator`.
 
 This is an integration design only.
@@ -20,7 +25,7 @@ Read alongside:
 * `docs/DropTheManMovementAndCollectionRules.md`
 * `docs/DropTheManMovementCoordinatorDesign.md`
 * `docs/DropTheManMovementEdgeCaseChecklist.md`
-* `docs/DropTheManMVPGameModuleRequirements.md`
+* `docs/DropTheManMVPRules.md`
 
 ---
 

@@ -2,6 +2,11 @@
 
 ## Purpose
 
+This document is the cross-system orchestration and composition authority. It does not own
+Unity scene-adapter behavior, full-hole completion lifecycle, or terminal arbitration. Those
+concerns are respectively authoritative in `DropTheManPlayableSceneAdapterDesign.md`,
+`DropTheManFullHoleCompletionFlowDesign.md`, and `DropTheManOutcomeRoutingDesign.md`.
+
 This document defines the narrow runtime integration and playable-scene wiring plan for the first playable `DropTheMan` prototype slice.
 
 It connects the already implemented prototype runtime foundations:
@@ -302,6 +307,12 @@ Explicit references are easier to audit and safer for the current prototype.
 
 ## 2. Runtime Model To Scene View Mapping
 
+The authoritative Unity scene-facing adapter contract, including view types, runtime-id assignment,
+hit testing, pointer projection, camera framing, and input-sample handling, is
+`DropTheManPlayableSceneAdapterDesign.md`. This section records only the orchestration boundary:
+runtime IDs connect model state to registered views, and views apply authoritative results without
+deciding gameplay.
+
 Recommended future owner:
 
 ```text
@@ -530,6 +541,11 @@ It should not become a general input framework.
 
 ## 4. Drag Flow Integration
 
+Gameplay movement and collection semantics are owned by
+`DropTheManMovementAndCollectionRules.md`. The full-hole lifecycle, occupancy cleanup, and
+presentation handoff are owned by `DropTheManFullHoleCompletionFlowDesign.md`; this integration
+layer only routes their explicit results between runtime services and views.
+
 The drag flow should preserve the existing service boundaries.
 
 ### Drag-Time Collection
@@ -630,6 +646,10 @@ Failed release commit:
 ---
 
 ## 5. Timer / Outcome Integration
+
+`DropTheManOutcomeRoutingDesign.md` is authoritative for the victory predicate, terminal request
+gate, and first-terminal-wins arbitration. This section only describes how the composition layer
+forwards timer-expired and completed-hole facts to that owner and reacts to an accepted result.
 
 The outcome router is already the prototype owner of terminal meaning.
 

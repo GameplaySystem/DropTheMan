@@ -14,6 +14,29 @@ Detailed movement, collection, capacity, and win-sequencing rules are further lo
 
 * `docs/DropTheManMovementAndCollectionRules.md`
 
+## Authority, MVP target, and ownership
+
+This is the canonical MVP-scope and high-level gameplay-rules document for Drop The Man. For
+detailed movement and collection semantics, `DropTheManMovementAndCollectionRules.md` is the
+authoritative source. Focused completion, outcome, scene-adapter, and progression documents own
+their respective concerns.
+
+The approved MVP target is:
+
+```text
+Load level -> drag hole -> collect matching stickmen during drag -> fill capacity ->
+complete full holes -> release/snap non-full holes -> win or lose.
+```
+
+`PuzzleFramework` owns generic level loading, grid and occupancy mechanics, runtime construction,
+drag and snap infrastructure, game-state and timer flow, and shared color identity.
+`DropAwayPrototype` owns Drop The Man nouns, color meaning, collection and capacity rules,
+win/loss interpretation, scene adapters, and presentation. Framework must not depend on this
+prototype or acquire puzzle-specific rules.
+
+The MVP assumes intended multi-cell hole shapes, single-cell stickmen, shape-based capacity, and
+no queue, buffer, pathfinding, progression, or broad visual-feedback generalization in this slice.
+
 ---
 
 ## Problem

@@ -2,6 +2,11 @@
 
 ## Purpose
 
+This is the single authoritative gameplay-semantics source for Drop The Man movement and
+collection. It owns the player-visible rules, lifecycle meaning, acceptance order, capacity,
+completion gate, timer interaction, and snap boundary. Companion documents may define session,
+algorithm, release-transaction, or test details, but must not redefine these semantics.
+
 This document locks the exact movement, collection, capacity, closing, and win-timing rules for the first playable `DropTheMan` slice.
 
 Use this document before implementing:
@@ -433,6 +438,24 @@ For each accepted drag update:
 9. After each triggered collection presentation completes, fill capacity.
 10. If fill count reaches capacity, stop dragging and begin hole completion flow.
 11. If the sweep encounters a blocker, stop at the last valid accepted position before the blocker.
+
+### Approved Deterministic Processing Policy
+
+The sweep is evaluated in board-local continuous space using contact groups generated when a
+footprint edge crosses a grid line. Footprint overlap uses half-open cell intervals so border
+touch alone does not count as entering a cell. Process groups in increasing sweep distance.
+
+Within a valid contact group, first validate the full footprint against structural and wrong-color
+blockers. Do not reserve a same-color collectible from a contact group that cannot be occupied.
+Order reservable same-color candidates by sweep distance, then grid Y ascending, then grid X
+ascending. This ordering is deterministic gameplay semantics; its event-generation implementation
+belongs to `DropTheManMovementCoordinatorDesign.md`.
+
+When a blocker is encountered, retain the previous accepted continuous position and stop further
+traversal. Reservation and presentation-completion semantics remain those defined above: a
+reservation is immediately non-blocking, while capacity fills only when its presentation completes.
+When that completion fills capacity, the hole becomes `Full`, stops normal dragging and collection,
+and begins the full-hole completion flow; remaining unprocessed targets stay available.
 
 ---
 
