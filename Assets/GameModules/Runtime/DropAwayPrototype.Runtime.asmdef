@@ -2,7 +2,9 @@
   "name": "DropAwayPrototype.Runtime",
   "rootNamespace": "DropAwayPrototype",
   "references": [
-    "PuzzleFramework.Runtime"
+    "PuzzleFramework.Runtime",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

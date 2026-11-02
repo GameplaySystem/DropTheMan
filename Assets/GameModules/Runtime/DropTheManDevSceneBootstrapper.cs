@@ -14,6 +14,27 @@ using PuzzleFramework.Progression;
 namespace DropAwayPrototype.Runtime
 {
     /// <summary>
+    /// Read-only catalog data exposed to Drop The Man presentation adapters.
+    /// Replay eligibility is resolved by the active progression policy.
+    /// </summary>
+    public readonly struct DropTheManLevelSelectionOption
+    {
+        public DropTheManLevelSelectionOption(
+            string levelId,
+            string displayName,
+            bool canReplay)
+        {
+            LevelId = levelId ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            CanReplay = canReplay;
+        }
+
+        public string LevelId { get; }
+        public string DisplayName { get; }
+        public bool CanReplay { get; }
+    }
+
+    /// <summary>
     /// Dev-only gameplay-scene bridge that builds a Drop The Man runtime model, initializes
     /// the pre-wired scene controller, and can drive a Resources-backed level catalog plus
     /// temporary result HUD. Progression is delegated to a profile session and game-owned policy.
@@ -36,6 +57,8 @@ namespace DropAwayPrototype.Runtime
         [SerializeField, Min(1)] private int loopFirstLevel = 1;
         [Tooltip("Inclusive last level number; 0 means the last shipped level.")]
         [SerializeField, Min(0)] private int loopLastLevel;
+        [Header("Legacy Development UI")]
+        [SerializeField] private bool legacyGameplayGuiEnabled = true;
         [FormerlySerializedAs("boardWorldOrigin")]
         [SerializeField] private Vector3 boardWorldCenter = Vector3.zero;
         [SerializeField] private Vector2 cellSize = Vector2.one;
@@ -55,8 +78,54 @@ namespace DropAwayPrototype.Runtime
 
         public DropTheManRuntimeModel RuntimeModel { get; private set; }
         public RuntimeLevelContext FrameworkContext { get; private set; }
+        public string CurrentLevelId => _currentLevelId;
+        public string CurrentLevelDisplayName => _currentDisplayName;
+        public bool CurrentLevelHasTimer => _activeTimerSystem != null;
+        public float CurrentLevelRemainingSeconds =>
+            _activeTimerSystem?.RemainingSeconds ?? 0f;
+        public bool LegacyGameplayGuiEnabled
+        {
+            get => legacyGameplayGuiEnabled;
+            set => legacyGameplayGuiEnabled = value;
+        }
+
+        public IReadOnlyList<DropTheManLevelSelectionOption> GetLevelSelectionOptions()
+        {
+            if (!HasLevelCatalog())
+            {
+                return Array.Empty<DropTheManLevelSelectionOption>();
+            }
+
+            var options = new DropTheManLevelSelectionOption[_levelCatalog.Count];
+            for (int i = 0; i < _levelCatalog.Count; i++)
+            {
+                LevelCatalogEntry entry = _levelCatalog.Entries[i];
+                string displayName = _catalogDisplayNames.TryGetValue(entry.LevelId, out string name)
+                    ? name
+                    : entry.LevelId;
+                bool canReplay = ProgressionEnabled &&
+                    _progression?.Levels != null &&
+                    _progression.Levels.CanReplay(entry.LevelId);
+                options[i] = new DropTheManLevelSelectionOption(
+                    entry.LevelId,
+                    displayName,
+                    canReplay);
+            }
+
+            return options;
+        }
+
+        /// <summary>Raised after a new runtime level has constructed and become active.</summary>
+        public event Action LevelLoaded;
+
+        /// <summary>
+        /// Stable bootstrapper-level relay for the active runtime controller's once-only outcome.
+        /// </summary>
+        public event Action<GameState> TerminalOutcomeAccepted;
 
         private LevelCatalog _levelCatalog;
+        private readonly Dictionary<string, string> _catalogDisplayNames =
+            new(StringComparer.Ordinal);
         private int _currentLevelIndex = -1;
         private string _currentLevelId = string.Empty;
         private string _currentDisplayName = string.Empty;
@@ -65,6 +134,8 @@ namespace DropAwayPrototype.Runtime
         private Rect _resultWindowRect = DefaultResultWindowRect;
         private DropTheManProgressionSession _progression;
         private DropTheManRuntimeController _observedController;
+        private TimerSystem _activeTimerSystem;
+        private bool _terminalOutcomeNotified;
         private string _progressionLoadError = string.Empty;
         private bool _showLevelPicker;
         private int _levelPickerPage;
@@ -96,7 +167,7 @@ namespace DropAwayPrototype.Runtime
 
         private void Update()
         {
-            if (_resultWindowVisible || sceneController == null)
+            if (_terminalOutcomeNotified || sceneController == null)
             {
                 return;
             }
@@ -107,22 +178,16 @@ namespace DropAwayPrototype.Runtime
                 return;
             }
 
-            if (controller.CurrentGameState == GameState.Won)
-            {
-                _resultState = LevelResultState.Completed;
-                _resultWindowVisible = true;
-                return;
-            }
-
-            if (controller.CurrentGameState == GameState.Lost)
-            {
-                _resultState = LevelResultState.Failed;
-                _resultWindowVisible = true;
-            }
+            HandleAcceptedOutcome(controller.CurrentGameState);
         }
 
         private void OnGUI()
         {
+            if (!legacyGameplayGuiEnabled)
+            {
+                return;
+            }
+
             DrawProgressionControls();
             if (!_resultWindowVisible || _showLevelPicker)
             {
@@ -281,9 +346,9 @@ namespace DropAwayPrototype.Runtime
             if (ProgressionEnabled)
             {
                 _progression.BeginLevel(_currentLevelId, isReplay);
-                _observedController = sceneController.RuntimeController;
-                _observedController.TerminalOutcomeAcceptedNow += HandleAcceptedOutcome;
             }
+            ObserveRuntimeController();
+            LevelLoaded?.Invoke();
             return true;
         }
 
@@ -300,6 +365,8 @@ namespace DropAwayPrototype.Runtime
             }
 
             CaptureLoadedLevelMetadata(levelDefinition);
+            ObserveRuntimeController();
+            LevelLoaded?.Invoke();
             return true;
         }
 
@@ -401,6 +468,7 @@ namespace DropAwayPrototype.Runtime
 
             FrameworkContext = frameworkBuildResult.Context;
             RuntimeModel = modelBuildResult.RuntimeModel;
+            _activeTimerSystem = timerSystem;
             failureReason = string.Empty;
             return true;
         }
@@ -709,13 +777,15 @@ namespace DropAwayPrototype.Runtime
 
         private void ResetLoadState()
         {
-            UnsubscribeProgression();
+            UnsubscribeRuntimeController();
             sceneController?.DisableInput();
             sceneController?.CancelDrag();
             sceneController?.ClearPointerState();
 
             RuntimeModel = null;
             FrameworkContext = null;
+            _activeTimerSystem = null;
+            _terminalOutcomeNotified = false;
             _resultState = LevelResultState.None;
             _resultWindowVisible = false;
         }
@@ -773,6 +843,7 @@ namespace DropAwayPrototype.Runtime
             }
 
             _levelCatalog = catalogResult.Catalog;
+            CacheCatalogDisplayNames();
             for (int i = 0; i < catalogResult.Warnings.Count; i++)
             {
                 Debug.LogWarning(catalogResult.Warnings[i], this);
@@ -780,6 +851,29 @@ namespace DropAwayPrototype.Runtime
 
             failureReason = string.Empty;
             return true;
+        }
+
+        private void CacheCatalogDisplayNames()
+        {
+            _catalogDisplayNames.Clear();
+            if (!HasLevelCatalog())
+            {
+                return;
+            }
+
+            for (int i = 0; i < _levelCatalog.Count; i++)
+            {
+                LevelCatalogEntry entry = _levelCatalog.Entries[i];
+                string displayName = entry.LevelId;
+                var provider = new DropTheManJsonLevelDefinitionProvider(entry.Asset);
+                if (provider.TryGetLevelDefinition(out LevelDefinition definition, out _) &&
+                    !string.IsNullOrWhiteSpace(definition?.Metadata?.DisplayName))
+                {
+                    displayName = definition.Metadata.DisplayName;
+                }
+
+                _catalogDisplayNames[entry.LevelId] = displayName;
+            }
         }
 
         private bool CanReloadCurrentLevel(out string failureReason)
@@ -845,19 +939,46 @@ namespace DropAwayPrototype.Runtime
 
         private void HandleAcceptedOutcome(GameState state)
         {
-            if (state != GameState.Won || !ProgressionEnabled) return;
-            _progression?.RecordAcceptedWin();
-            if (!string.IsNullOrEmpty(ProgressError)) Debug.LogWarning(ProgressError, this);
+            if (_terminalOutcomeNotified ||
+                (state != GameState.Won && state != GameState.Lost))
+            {
+                return;
+            }
+
+            _terminalOutcomeNotified = true;
+            if (state == GameState.Won && ProgressionEnabled)
+            {
+                _progression?.RecordAcceptedWin();
+                if (!string.IsNullOrEmpty(ProgressError)) Debug.LogWarning(ProgressError, this);
+            }
+
+            _resultState = state == GameState.Won
+                ? LevelResultState.Completed
+                : LevelResultState.Failed;
+            _resultWindowVisible = true;
+            TerminalOutcomeAccepted?.Invoke(state);
         }
 
-        private void UnsubscribeProgression()
+        private void ObserveRuntimeController()
+        {
+            UnsubscribeRuntimeController();
+            _observedController = sceneController != null
+                ? sceneController.RuntimeController
+                : null;
+            if (_observedController != null)
+            {
+                _observedController.TerminalOutcomeAcceptedNow += HandleAcceptedOutcome;
+            }
+        }
+
+        private void UnsubscribeRuntimeController()
         {
             if (_observedController == null) return;
             _observedController.TerminalOutcomeAcceptedNow -= HandleAcceptedOutcome;
             _observedController = null;
         }
 
-        private void OnDestroy() => UnsubscribeProgression();
+        private void OnDestroy() => UnsubscribeRuntimeController();
         private void OnApplicationPause(bool paused) { if (paused) _progression?.TrySave(); }
         private void OnApplicationQuit() => _progression?.TrySave();
 

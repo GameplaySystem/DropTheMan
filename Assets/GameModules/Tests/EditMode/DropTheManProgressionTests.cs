@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using DropAwayPrototype.Runtime;
@@ -6,7 +7,13 @@ using PuzzleFramework.Progression;
 using PuzzleFramework.CoreBoard;
 using PuzzleFramework.RuntimeConstruction;
 using PuzzleFramework.RuntimeFlow;
+using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace DropAwayPrototype.Tests
 {
@@ -347,6 +354,212 @@ namespace DropAwayPrototype.Tests
         }
 
         [Test]
+        public void TimedRuntimeReportsRemainingTimeAndAcceptsLossOnceAtExpiration()
+        {
+            var provider = new DropTheManDevLevelDefinitionProvider(
+                DropTheManDevLevelData.CreateDefault());
+            Assert.That(provider.TryGetLevelDefinition(out var definition, out var failure),
+                Is.True, failure);
+            var built = new LevelRuntimeBuilder(new LevelRuntimeConstructionValidator()).Build(definition);
+            Assert.That(built.Success, Is.True, built.FailureReason);
+            var model = new DropTheManRuntimeModelBuilder().Build(definition, built.Context);
+            Assert.That(model.Success, Is.True, model.FailureReason);
+
+            var timer = new TimerSystem(2f);
+            var runtime = new DropTheManRuntimeController(
+                model.RuntimeModel,
+                new GridWorldLayout(Vector3.zero, Vector2.one, Vector3.right, Vector3.forward),
+                new DropTheManViewRegistry(),
+                new GameStateSystem(),
+                timerSystem: timer);
+            int notifications = 0;
+            GameState notifiedState = GameState.NotStarted;
+            runtime.TerminalOutcomeAcceptedNow += state =>
+            {
+                notifications++;
+                notifiedState = state;
+            };
+
+            Assert.That(runtime.StartGameplay().Success, Is.True);
+            var firstTick = runtime.TickTimer(0.5f);
+            Assert.That(firstTick.TimerAdvanceResult.IsSuccess, Is.True);
+            Assert.That(timer.RemainingSeconds, Is.EqualTo(1.5f).Within(0.001f));
+            Assert.That(notifications, Is.Zero);
+
+            var expirationTick = runtime.TickTimer(1.5f);
+            Assert.That(expirationTick.TimerAdvanceResult.ExpiredRaised, Is.True);
+            Assert.That(timer.RemainingSeconds, Is.Zero);
+            Assert.That(runtime.CurrentGameState, Is.EqualTo(GameState.Lost));
+            Assert.That(notifiedState, Is.EqualTo(GameState.Lost));
+            Assert.That(notifications, Is.EqualTo(1));
+
+            runtime.TickTimer(1f);
+            Assert.That(notifications, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PresentationApiIsSafeBeforeBootstrapAndLegacyGuiCanBeDisabled()
+        {
+            var obj = new GameObject("PresentationApiTest");
+            try
+            {
+                var bootstrapper = obj.AddComponent<DropTheManDevSceneBootstrapper>();
+                Assert.That(bootstrapper.CurrentLevelId, Is.Empty);
+                Assert.That(bootstrapper.CurrentLevelDisplayName, Is.Empty);
+                Assert.That(bootstrapper.CurrentLevelHasTimer, Is.False);
+                Assert.That(bootstrapper.CurrentLevelRemainingSeconds, Is.Zero);
+                Assert.That(bootstrapper.GetLevelSelectionOptions(), Is.Empty);
+                Assert.That(bootstrapper.LegacyGameplayGuiEnabled, Is.True);
+
+                bootstrapper.LegacyGameplayGuiEnabled = false;
+                Assert.That(bootstrapper.LegacyGameplayGuiEnabled, Is.False);
+            }
+            finally { Object.DestroyImmediate(obj); }
+        }
+
+        [Test]
+        public void GameplaySceneContainsWiredAuthoredCanvasPresentation()
+        {
+            Scene scene = EditorSceneManager.OpenScene(
+                "Assets/Scenes/DropTheManDevTest.unity",
+                OpenSceneMode.Additive);
+            try
+            {
+                DropTheManGameplayUiPresenter presenter =
+                    FindComponentInScene<DropTheManGameplayUiPresenter>(scene);
+                Assert.That(presenter, Is.Not.Null);
+                Assert.That(presenter.GetComponent<Canvas>(), Is.Not.Null);
+                Assert.That(FindComponentInScene<EventSystem>(scene), Is.Not.Null);
+
+                var presenterData = new SerializedObject(presenter);
+                string[] requiredReferences =
+                {
+                    "bootstrapper",
+                    "sceneController",
+                    "levelText",
+                    "timerPanel",
+                    "timerText",
+                    "chooseLevelButton",
+                    "outcomePanel",
+                    "outcomeTitleText",
+                    "outcomeMessageText",
+                    "nextLevelButton",
+                    "replayLevelButton",
+                    "chooseLevelFromOutcomeButton",
+                    "levelSelectionPanel",
+                    "levelListContent",
+                    "levelButtonTemplate",
+                    "closeLevelSelectionButton",
+                    "feedbackText"
+                };
+                for (int i = 0; i < requiredReferences.Length; i++)
+                {
+                    SerializedProperty property = presenterData.FindProperty(requiredReferences[i]);
+                    Assert.That(property, Is.Not.Null, requiredReferences[i]);
+                    Assert.That(property.objectReferenceValue, Is.Not.Null, requiredReferences[i]);
+                }
+
+                GameObject outcomePanel = (GameObject)presenterData
+                    .FindProperty("outcomePanel").objectReferenceValue;
+                GameObject levelSelectionPanel = (GameObject)presenterData
+                    .FindProperty("levelSelectionPanel").objectReferenceValue;
+                Assert.That(outcomePanel.activeSelf, Is.False);
+                Assert.That(levelSelectionPanel.activeSelf, Is.False);
+
+                DropTheManDevSceneBootstrapper bootstrapper =
+                    FindComponentInScene<DropTheManDevSceneBootstrapper>(scene);
+                var bootstrapperData = new SerializedObject(bootstrapper);
+                Assert.That(
+                    bootstrapperData.FindProperty("legacyGameplayGuiEnabled").boolValue,
+                    Is.False);
+            }
+            finally
+            {
+                if (SceneManager.sceneCount > 1)
+                {
+                    EditorSceneManager.CloseScene(scene, true);
+                }
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator GameplayCanvasSupportsTimerSelectionFailureAndReplay()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/Scenes/DropTheManDevTest.unity",
+                OpenSceneMode.Single);
+            yield return new EnterPlayMode();
+            yield return null;
+            yield return null;
+
+            DropTheManGameplayUiPresenter presenter =
+                Object.FindFirstObjectByType<DropTheManGameplayUiPresenter>();
+            DropTheManDevSceneBootstrapper bootstrapper =
+                Object.FindFirstObjectByType<DropTheManDevSceneBootstrapper>();
+            DropTheManSceneController sceneController =
+                Object.FindFirstObjectByType<DropTheManSceneController>();
+            Assert.That(presenter, Is.Not.Null);
+            Assert.That(bootstrapper.CurrentLevelId, Is.Not.Empty);
+            Assert.That(bootstrapper.CurrentLevelDisplayName, Is.Not.Empty);
+            Assert.That(bootstrapper.CurrentLevelHasTimer, Is.True);
+            Assert.That(bootstrapper.LegacyGameplayGuiEnabled, Is.False);
+            Assert.That(sceneController.InputEnabled, Is.True);
+
+            var presenterData = new SerializedObject(presenter);
+            GameObject timerPanel = (GameObject)presenterData
+                .FindProperty("timerPanel").objectReferenceValue;
+            Component timerText = (Component)presenterData
+                .FindProperty("timerText").objectReferenceValue;
+            Assert.That(timerPanel.activeSelf, Is.True);
+            Assert.That(new SerializedObject(timerText).FindProperty("m_text").stringValue,
+                Does.Match(@"^\d{2}:\d{2}$"));
+
+            presenter.OpenLevelSelection();
+            yield return null;
+            Assert.That(sceneController.InputEnabled, Is.False);
+            GameObject selectionPanel = (GameObject)presenterData
+                .FindProperty("levelSelectionPanel").objectReferenceValue;
+            Assert.That(selectionPanel.activeSelf, Is.True);
+            Transform content = (Transform)presenterData
+                .FindProperty("levelListContent").objectReferenceValue;
+            IReadOnlyList<DropTheManLevelSelectionOption> options =
+                bootstrapper.GetLevelSelectionOptions();
+            for (int i = 0; i < options.Count; i++)
+            {
+                Transform row = content.Find($"LevelButton_{options[i].LevelId}");
+                Assert.That(row, Is.Not.Null, options[i].LevelId);
+                Assert.That(row.GetComponent<Button>().interactable,
+                    Is.EqualTo(options[i].CanReplay), options[i].LevelId);
+            }
+
+            presenter.CloseLevelSelection();
+            yield return null;
+            Assert.That(selectionPanel.activeSelf, Is.False);
+            Assert.That(sceneController.InputEnabled, Is.True);
+
+            string failedLevelId = bootstrapper.CurrentLevelId;
+            sceneController.RuntimeController.HandleTimerExpired();
+            yield return null;
+            GameObject outcomePanel = (GameObject)presenterData
+                .FindProperty("outcomePanel").objectReferenceValue;
+            Button nextButton = (Button)presenterData
+                .FindProperty("nextLevelButton").objectReferenceValue;
+            Button replayButton = (Button)presenterData
+                .FindProperty("replayLevelButton").objectReferenceValue;
+            Assert.That(outcomePanel.activeSelf, Is.True);
+            Assert.That(nextButton.gameObject.activeSelf, Is.False);
+            Assert.That(replayButton.gameObject.activeSelf, Is.True);
+
+            replayButton.onClick.Invoke();
+            yield return null;
+            Assert.That(bootstrapper.CurrentLevelId, Is.EqualTo(failedLevelId));
+            Assert.That(outcomePanel.activeSelf, Is.False);
+            Assert.That(sceneController.InputEnabled, Is.True);
+
+            yield return new ExitPlayMode();
+        }
+
+        [Test]
         public void EditorProfilePathIsSeparateFromPlayerProfile()
         {
             var obj = new GameObject("ProgressionPathTest");
@@ -392,6 +605,21 @@ namespace DropAwayPrototype.Tests
             var session = new DropTheManProgressionSession(store, "profile");
             Assert.That(session.TryLoad(Levels, 1, 0), Is.True, session.Error);
             return session;
+        }
+
+        private static T FindComponentInScene<T>(Scene scene) where T : Component
+        {
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+            {
+                T component = roots[i].GetComponentInChildren<T>(true);
+                if (component != null)
+                {
+                    return component;
+                }
+            }
+
+            return null;
         }
 
         private sealed class MemoryStore : IProgressSaveLoadService
