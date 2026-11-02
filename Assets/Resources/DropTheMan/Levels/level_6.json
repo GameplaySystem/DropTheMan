@@ -1,0 +1,124 @@
+{
+    "FormatVersion": 1,
+    "LevelId": "Level 6",
+    "DisplayName": "6",
+    "Board": {
+        "Width": 4,
+        "Height": 8,
+        "BlockedCells": [
+            {
+                "X": 2,
+                "Y": 4
+            },
+            {
+                "X": 2,
+                "Y": 5
+            },
+            {
+                "X": 2,
+                "Y": 3
+            }
+        ]
+    },
+    "Timer": {
+        "Enabled": true,
+        "DurationSeconds": 35.0,
+        "WarningThresholdSeconds": 0.0
+    },
+    "Holes": [
+        {
+            "Id": "hole_001",
+            "Color": "Slot6",
+            "Coordinate": {
+                "X": 0,
+                "Y": 4
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                },
+                {
+                    "X": 1,
+                    "Y": 0
+                },
+                {
+                    "X": 1,
+                    "Y": 1
+                }
+            ]
+        },
+        {
+            "Id": "hole_002",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 1,
+                "Y": 1
+            },
+            "FootprintOffsets": [
+                {
+                    "X": 0,
+                    "Y": 0
+                },
+                {
+                    "X": 0,
+                    "Y": 1
+                }
+            ]
+        }
+    ],
+    "Stickmen": [
+        {
+            "Id": "stickman_001",
+            "Color": "Slot6",
+            "Coordinate": {
+                "X": 0,
+                "Y": 7
+            }
+        },
+        {
+            "Id": "stickman_002",
+            "Color": "Slot6",
+            "Coordinate": {
+                "X": 1,
+                "Y": 7
+            }
+        },
+        {
+            "Id": "stickman_003",
+            "Color": "Slot6",
+            "Coordinate": {
+                "X": 2,
+                "Y": 1
+            }
+        },
+        {
+            "Id": "stickman_004",
+            "Color": "Slot6",
+            "Coordinate": {
+                "X": 3,
+                "Y": 1
+            }
+        },
+        {
+            "Id": "stickman_005",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 0,
+                "Y": 2
+            }
+        },
+        {
+            "Id": "stickman_006",
+            "Color": "Slot4",
+            "Coordinate": {
+                "X": 0,
+                "Y": 1
+            }
+        }
+    ]
+}
